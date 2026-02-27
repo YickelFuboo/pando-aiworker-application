@@ -5,6 +5,7 @@ Agent 类型任务级、项目级由各业务自定义 MemoryExtractPrompt。
 """
 import json
 import logging
+from pathlib import Path
 from typing import List, Optional, Tuple
 from pydantic import BaseModel, Field
 from app.agents.sessions.message import Message
@@ -222,6 +223,7 @@ class MemoryManager:
     async def consolidate_memory(
         self,
         session: Session,
+        workspace: Path,
         llm_provider: str = "",
         llm_name: str = "",
         *,

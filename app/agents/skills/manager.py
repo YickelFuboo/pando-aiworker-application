@@ -15,7 +15,6 @@ from app.agents.sessions.session import Session
 BUILTIN_SKILLS_DIR = Path(__file__).parent
 AGENT_DIR = Path(__file__).parent / "agent"
 
-
 class SkillsManager:
     """
     技能加载器：从工作区与内置目录列举/读取 SKILL.md，为 ContextBuilder 提供

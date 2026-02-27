@@ -125,8 +125,9 @@ class Settings(BaseSettings):
     # =============================================================================
     agent_session_use_local_storage: bool = Field(default=False, description="为 True 时会话存本地文件，为 False 时存数据库", env="AGENT_SESSION_USE_LOCAL_STORAGE")
     agent_session_storage_dir: str = Field(default="data/sessions", description="本地会话文件目录(仅本地存储时生效)", env="AGENT_SESSION_STORAGE_DIR")
-    
-    
+    agent_memory_use_local_storage: bool = Field(default=False, description="为 True 时记忆存本地文件，为 False 时存数据库", env="AGENT_MEMORY_USE_LOCAL_STORAGE")
+    agent_memory_storage_dir: str = Field(default="data/memory", description="本地记忆文件目录(仅本地存储时生效)", env="AGENT_MEMORY_STORAGE_DIR")
+
     class Config:
         env_file = os.path.join(PROJECT_BASE_DIR, "env")
         env_file_encoding = "utf-8"
