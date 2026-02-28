@@ -62,6 +62,13 @@ class SessionManager:
         except Exception as e:
             logging.error("Error adding message to session %s: %s", session_id, e)
             return False
+    
+    async def get_messages(self, session_id: str) -> List[Message]:
+        """Get messages from session"""
+        session = await self.get_session(session_id)
+        if not session:
+            return []
+        return session.get_messages()
 
     async def get_all_sessions(self) -> List[Session]:
         """获取所有会话。按需 get_all 并合并到缓存。"""

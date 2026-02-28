@@ -116,14 +116,17 @@ class Message(BaseModel):
             if self.content:
                 content = self.content
                 content += "\n\n"
-            # 添加toolcall信息
-            content += "  执行工具：\n"
-            for index, tool_call in enumerate(self.tool_calls):
-                content += f"    {index+1}. {tool_call.function.name}\n"
-                content += "      参数：\n"
-                args_dict = json.loads(tool_call.function.arguments)
-                formatted_json = json.dumps(args_dict, ensure_ascii=False, indent=2)
-                content += f"```json\n{formatted_json}\n```\n\n"
+            # 添加toolcall信息，格式：工具执行：web_search("北京天气")，other_tool("arg")
+            content += "工具执行："
+            parts = []
+            for tool_call in self.tool_calls:
+                args_dict = json.loads(tool_call.function.arguments or "{}")
+                args_str = ", ".join(
+                    f'"{v}"' if isinstance(v, str) else str(v)
+                    for v in args_dict.values()
+                )
+                parts.append(f"{tool_call.function.name}({args_str})")
+            content += "，".join(parts)
         elif self.name and self.tool_call_id:
             content = f"  工具{self.name}执行结果：\n\n{self.content}"
         else:

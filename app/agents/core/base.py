@@ -43,6 +43,9 @@ class BaseAgent(BaseModel, ABC):
     # 模型信息
     llm_provider: str = Field(..., description="LLM provider")
     llm_name: str = Field(..., description="LLM model name")
+    temperature: float = Field(default=0.7, description="Temperature")
+    max_tokens: int = Field(default=4096, description="Max tokens")
+    memory_window: int = Field(default=10, description="Memory window")
 
     # 执行步数相关
     state: AgentState = Field(default=AgentState.IDLE, description="Current agent state")
@@ -60,11 +63,14 @@ class BaseAgent(BaseModel, ABC):
         description: str,
         session_id: str,
         workspace: str,
-        system_prompt: str,
-        user_prompt: str,
-        next_step_prompt: str,
-        llm_provider: str,
-        llm_name: str,
+        system_prompt: Optional[str] = None,
+        user_prompt: Optional[str] = None,
+        next_step_prompt: Optional[str] = None,
+        llm_provider: Optional[str] = None,
+        llm_name: Optional[str] = None,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        memory_window: int = 100,
         max_steps: int = 50,
         max_duplicate_steps: int = 2,
         **kwargs: Any,
@@ -79,6 +85,9 @@ class BaseAgent(BaseModel, ABC):
             next_step_prompt=next_step_prompt,
             llm_provider=llm_provider,
             llm_name=llm_name,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            memory_window=memory_window,
             max_steps=max_steps,
             max_duplicate_steps=max_duplicate_steps,
             **kwargs,
@@ -99,7 +108,15 @@ class BaseAgent(BaseModel, ABC):
             logging.error(f"Error in agent reset: {str(e)}")
             raise e
 
-    async def run(self, question: str) -> None:
+    async def run(self, question: str) -> str:
+        """Run the agent
+        
+        Args:
+            question: Input question
+            
+        Returns:
+            str: Execution result
+        """
         pass
  
     def handle_stuck_state(self):
@@ -154,7 +171,8 @@ class BaseAgent(BaseModel, ABC):
 
     async def notify_user(self, session_id: str, message: Message):
         """Notify user"""
-        #????
+        message = message.to_user_message()
+        #发送给用户
 
     async def push_history_message_and_notify_user(self, session_id: str, message: Message):
         """Add message to session and push user"""

@@ -38,7 +38,6 @@ def _validate_url(url: str) -> tuple[bool, str]:
         return False, str(e)
 
 
-
 class WebSearchTool(BaseTool):
     """Brave Web 搜索工具，返回标题、URL 与摘要。"""
 

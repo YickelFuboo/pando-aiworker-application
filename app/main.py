@@ -17,6 +17,7 @@ from app.infrastructure.vector_store import VECTOR_STORE_CONN
 from app.infrastructure.redis import REDIS_CONN
 from app.utils.auth.jwt_middleware import jwt_middleware
 from app.agents.sessions.api import router as sessions_router
+from app.agents.bus.queues import MessageBus
 
 
 # 创建FastAPI应用
@@ -79,22 +80,13 @@ def run_celery_worker():
 @app.on_event("startup")
 async def startup_event():
     """应用启动时初始化"""
-    try:      
+    try:
         logging.info("开始应用启动流程...")
-        
-        # 在debug模式下启动Celery Worker
-        """ if settings.debug:
-            logging.info("🔧 开发模式：准备启动 Celery Worker...")
-            try:
-                t = threading.Thread(target=run_celery_worker, daemon=True)
-                t.start()
-                await asyncio.sleep(0.1)
-                logging.info("✅ Celery Worker 已在后台线程启动（开发模式）")
-            except Exception as worker_error:
-                logging.warning(f"⚠️ Celery Worker 启动失败，但不影响主应用: {worker_error}")
-        else:
-            logging.info("🏭 生产模式：跳过 Celery Worker 启动")
-        """
+
+        message_bus = MessageBus()
+        app.state.message_bus = message_bus
+        app.state.message_bus_task = asyncio.create_task(message_bus.run())
+        logging.info("MessageBus 已在后台运行")
 
         logging.info(f"{APP_NAME} v{APP_VERSION} 启动成功")
 
@@ -105,6 +97,14 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     """应用关闭时清理"""
+    task = getattr(app.state, "message_bus_task", None)
+    if task and not task.done():
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        logging.info("MessageBus 已停止")
     try:
         # 关闭数据库连接
         await close_db()
