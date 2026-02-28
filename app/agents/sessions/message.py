@@ -134,8 +134,8 @@ class Message(BaseModel):
         message['content'] = content
 
         # 添加创建时间
-        if self.create_time:
-            message['create_time'] = self.create_time.strftime("%Y-%m-%d %H:%M:%S")
+        message['create_time'] = self.create_time.strftime("%Y-%m-%d %H:%M:%S")
+        
         return message
 
     @classmethod
