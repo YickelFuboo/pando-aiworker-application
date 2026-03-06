@@ -2,7 +2,7 @@ import os
 from typing import Optional
 from pydantic_settings import BaseSettings
 from pydantic import Field
-from app.utils.common import get_project_meta, get_project_base_directory
+from app.utils.common import get_project_meta
 
 
 # 定义全局配置常量
@@ -11,7 +11,7 @@ APP_NAME = _meta["name"]
 APP_VERSION = _meta["version"]
 APP_DESCRIPTION = _meta["description"]
 
-PROJECT_BASE_DIR = get_project_base_directory()
+PROJECT_BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 class Settings(BaseSettings):
     """应用配置类 - 平铺结构"""

@@ -3,7 +3,7 @@ import os
 from abc import ABC, abstractmethod
 from copy import copy
 from typing import Dict, Any, Optional, Type, TypeVar, Generic
-from app.utils.common import get_project_base_directory
+from app.config.settings import PROJECT_BASE_DIR
 
 T = TypeVar('T')
 
@@ -23,7 +23,7 @@ class BaseModelFactory(ABC, Generic[T]):
         Args:
             config_filename: 配置文件名称
         """
-        self.config_path = os.path.join(get_project_base_directory(), "app", "config", config_filename)
+        self.config_path = os.path.join(PROJECT_BASE_DIR, "app", "config", config_filename)
         self._config = None
         self.load_config()
     

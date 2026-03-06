@@ -10,8 +10,8 @@ import asyncio
 import dashscope
 from pathlib import Path
 from dashscope import MultiModalConversation
-from app.config.settings import settings
-from app.utils.common import get_project_base_directory, is_english
+from app.config.settings import PROJECT_BASE_DIR, settings
+from app.utils.common import is_english
 from app.infrastructure.llms.computervision_models.base.base import BaseComputerVision, MAX_RETRY_ATTEMPTS
 from app.infrastructure.llms.prompts.prompt_template_load import get_prompt_template
 
@@ -237,7 +237,7 @@ class QWenCV(BaseComputerVision):
         Returns:
             Dict[str, Any]: 消息格式
         """
-        tmp_dir = os.path.join(get_project_base_directory(), settings.tmp_dir)
+        tmp_dir = os.path.join(PROJECT_BASE_DIR, settings.tmp_dir)
         if not os.path.exists(tmp_dir):
             os.makedirs(tmp_dir, exist_ok=True)
         path = os.path.join(tmp_dir, "%s.jpg" % uuid.uuid1().hex())
@@ -267,7 +267,7 @@ class QWenCV(BaseComputerVision):
             str: 视觉LLM提示词
         """
 
-        tmp_dir = os.path.join(get_project_base_directory(), settings.tmp_dir)
+        tmp_dir = os.path.join(PROJECT_BASE_DIR, settings.tmp_dir)
         if not os.path.exists(tmp_dir):
             os.makedirs(tmp_dir, exist_ok=True)
         path = os.path.join(tmp_dir, "%s.jpg" % uuid.uuid1().hex())

@@ -9,9 +9,8 @@ from typing import List, Tuple, Any, Optional
 from urllib.parse import urljoin
 import numpy as np
 import asyncio
-from app.config.settings import Settings
+from app.config.settings import PROJECT_BASE_DIR, Settings
 from app.infrastructure.llms.utils import num_tokens_from_string, truncate
-from app.utils.common import get_project_base_directory
 
 # 重试配置常量
 MAX_RETRY_ATTEMPTS = 3  # 最大尝试次数
@@ -100,7 +99,7 @@ class BaseEmbedding(ABC):
         settings = Settings()
         
         # 创建缓存目录
-        cache_dir = os.path.join(get_project_base_directory(), settings.model_cache_dir, "embeddings")
+        cache_dir = os.path.join(PROJECT_BASE_DIR, settings.model_cache_dir, "embeddings")
         os.makedirs(cache_dir, exist_ok=True)
         
         # 清理模型名称，移除用户名前缀
