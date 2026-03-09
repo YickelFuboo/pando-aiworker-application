@@ -41,7 +41,7 @@ class ReActAgent(BaseAgent):
         agent_type: str,
         channel_type: str,
         channel_id: str,
-        session: Session,
+        session_id: str,
         workspace_index: str,
         user_id: Optional[str] = None,
         system_prompt: Optional[str] = None,
@@ -62,7 +62,7 @@ class ReActAgent(BaseAgent):
             agent_type=agent_type,
             channel_type=channel_type,
             channel_id=channel_id,
-            session=session,
+            session_id=session_id,
             workspace_index=workspace_index,
             user_id=user_id,
             system_prompt=system_prompt,
@@ -166,7 +166,7 @@ class ReActAgent(BaseAgent):
         """        
         logging.info(f"Running agent {self.agent_name} with question: {question}")
 
-        if not self.session or not self.workspace_index:
+        if not self.session_id or not self.workspace_index:
             raise ValueError("Session and workspace_index are required")
         
         # 检查并重置状态
@@ -229,8 +229,6 @@ class ReActAgent(BaseAgent):
         finally:
             # 记忆合并
             await self.memory_manager.consolidate_memory()
-            # 会话历史记录落盘
-            await SESSION_MANAGER.save_session(self.session.session_id)
             await self.clear()
 
 

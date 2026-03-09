@@ -64,7 +64,8 @@ async def get_session_messages(session_id: str):
     session = await SESSION_MANAGER.get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    return [UserMessage(**msg.to_user_message()) for msg in session.messages]
+    messages = await SESSION_MANAGER.get_messages(session_id)
+    return [UserMessage(**msg.to_user_message()) for msg in messages]
 
 @router.put(
     "/metadata/{session_id}",

@@ -12,8 +12,8 @@ from app.agents.sessions.session import Session
 from app.agents.skills.manager import SkillsManager
 from app.agents.tools.base import BaseTool
 from app.agents.tools.factory import ToolsFactory
+from app.config.settings import PROJECT_BASE_DIR
 from app.infrastructure.llms.chat_models.factory import llm_factory
-from app.utils.common import get_project_base_directory
 
 
 class AgentState(str, Enum):
@@ -25,8 +25,8 @@ class AgentState(str, Enum):
     FINISHED = "FINISHED"  # Finished state
 
 # 当前文件所在目录（各技能为子目录，如 memory/SKILL.md）
-AGENT_DIR = Path(get_project_base_directory()) / ".agent"
-WORKSPACE_DIR = Path(get_project_base_directory()) / ".workspace"
+AGENT_DIR = Path(PROJECT_BASE_DIR) / ".agent"
+WORKSPACE_DIR = Path(PROJECT_BASE_DIR) / ".workspace"
 
 class BaseAgent(ABC):
     """Base Agent class
@@ -42,7 +42,7 @@ class BaseAgent(ABC):
         agent_type: str,
         channel_type: str,
         channel_id: str,
-        session: Session,
+        session_id: str,
         workspace_index: str,
         user_id: Optional[str] = None,
         system_prompt: Optional[str] = None,
@@ -67,7 +67,7 @@ class BaseAgent(ABC):
         self.channel_id = channel_id
 
         # 会话与用户
-        self.session = session
+        self.session_id = session_id
         self.workspace_index = workspace_index
         self.user_id = user_id
 
@@ -92,8 +92,8 @@ class BaseAgent(ABC):
         # 上下文构建器、记忆管理器、技能管理器        
         cur_agent_path = str(AGENT_DIR / agent_type)
         cur_workspace_path = str(WORKSPACE_DIR / workspace_index)
-        self.context_builder = ContextBuilder(session.session_id, cur_agent_path, cur_workspace_path, kwargs)
-        self.memory_manager = MemoryManager(session.session_id, cur_agent_path, cur_workspace_path)
+        self.context_builder = ContextBuilder(self.session_id, cur_agent_path, cur_workspace_path, kwargs)
+        self.memory_manager = MemoryManager(self.session_id, cur_agent_path, cur_workspace_path)
         self.skills_manager = SkillsManager(cur_agent_path, cur_workspace_path)
 
     def reset(self):
@@ -158,16 +158,16 @@ class BaseAgent(ABC):
 
     async def get_history_messages(self) -> List[Message]:
         """Get messages from session"""
-        return self.session.get_messages()
+        return await SESSION_MANAGER.get_messages(self.session_id)
 
     async def get_history_context(self) -> List[Dict[str, Any]]:
         """Get history for context"""
-        return self.session.get_context()
+        return await SESSION_MANAGER.get_context(self.session_id)
 
     async def push_history_message(self, message: Message):
         """Add message to session and push user"""
         # 记录会话历史
-        self.session.add_message(message)
+        await SESSION_MANAGER.add_message(self.session_id, message)
 
     async def notify_user(self, message: Message):
         """Notify user"""
@@ -177,7 +177,7 @@ class BaseAgent(ABC):
             channel_type=self.channel_type,
             channel_id=self.channel_id,
             user_id=self.user_id,
-            session_id=self.session.session_id,
+            session_id=self.session_id,
             content=msg_dict.get("content", ""),
         ))
 

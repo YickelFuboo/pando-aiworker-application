@@ -2,7 +2,7 @@
 import logging
 import uuid
 from datetime import datetime
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 from .message import Message
 from .session import Session
 from .store import SessionStore, LocalFileSessionStore, DatabaseSessionStore
@@ -47,7 +47,7 @@ class SessionManager:
                 session.set_metadata(key, value)
 
         self.sessions[session_id] = session
-        #await self._store.save(session)
+        await self._store.save(session)
 
         logging.info("Created session: %s", session_id)
         return session_id
@@ -59,7 +59,7 @@ class SessionManager:
             return False
         try:
             session.add_message(message)
-            #await self._store.save(session)
+            await self._store.save(session)
             return True
         except Exception as e:
             logging.error("Error adding message to session %s: %s", session_id, e)
@@ -71,6 +71,13 @@ class SessionManager:
         if not session:
             return []
         return session.get_messages()
+
+    async def get_context(self, session_id: str, max_messages: int = 500) -> List[Dict[str, Any]]:
+        """获取会话上下文（未合并消息），供 LLM 使用。"""
+        session = await self.get_session(session_id)
+        if not session:
+            return []
+        return session.get_context(max_messages=max_messages)
 
     async def get_all_sessions(
         self,

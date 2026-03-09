@@ -104,7 +104,7 @@ class MessageBus:
             agent_type=inbound_msg.agent_type,
             channel_type=inbound_msg.channel_type,
             channel_id=inbound_msg.channel_id,
-            session=session,
+            session_id=inbound_msg.session_id,
             workspace_index=inbound_msg.session_id,
             user_id=inbound_msg.user_id,
             llm_provider=inbound_msg.llm_provider,
