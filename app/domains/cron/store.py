@@ -50,6 +50,7 @@ def _job_to_dict(j: CronJob) -> dict:
         "payload": {
             "kind": j.payload.kind.value,
             "message": j.payload.message,
+            "triggerSessionId": j.payload.trigger_session_id,
             "needDeliver": j.payload.need_deliver,
             "deliverTo": j.payload.deliver_to,
             "deliverChannelType": j.payload.deliver_channel_type,
@@ -93,6 +94,7 @@ def _dict_to_job(d: dict) -> CronJob:
         payload=CronPayload(
             kind=_parse_payload_kind(p.get("kind", "remind")),
             message=p.get("message", ""),
+            trigger_session_id=p.get("triggerSessionId"),
             need_deliver=p.get("needDeliver", p.get("deliver", False)),
             deliver_to=p.get("deliverTo", p.get("to")),
             deliver_channel_type=p.get("deliverChannelType", p.get("channelType", p.get("channel"))),

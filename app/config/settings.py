@@ -128,6 +128,11 @@ class Settings(BaseSettings):
     brave_api_key: str = Field(default="", description="Brave搜索API密钥", env="BRAVE_API_KEY")
 
     # =============================================================================
+    # Cron 配置 - 定时任务调度
+    # =============================================================================
+    run_cron: bool = Field(default=True, description="当前进程是否运行 cron 调度循环；多进程部署时仅在一个进程设为 True，避免重复执行", env="RUN_CRON")
+
+    # =============================================================================
     # Agent配置 - Agent 会话存储
     # =============================================================================
     agent_session_use_local_storage: bool = Field(default=False, description="为 True 时会话存本地文件，为 False 时存数据库", env="AGENT_SESSION_USE_LOCAL_STORAGE")

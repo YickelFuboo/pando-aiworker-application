@@ -18,6 +18,7 @@ from app.agents.tools.local.dir_operator import ListDirTool
 from app.agents.tools.local.shell import ExecTool
 from app.agents.tools.local.web import WebSearchTool, WebFetchTool
 from app.agents.tools.local.terminate import Terminate
+from app.agents.tools.local.cron import CronTool
 
 
 # MCP 配置：.agent/{agent_type}/mcp/mcp_servers.json
@@ -107,12 +108,18 @@ class ReActAgent(BaseAgent):
         # 如果没有指定工具，则注册默认工具
         if self.available_tools:
             self.available_tools.register_tools(
-                #ReadFileTool(),
-                #WriteFileTool(),
-                #ReleaseFileTextTool(),
-                #InsertFileTool(),
-                #ListDirTool(),
+                ReadFileTool(),
+                WriteFileTool(),
+                ReleaseFileTextTool(),
+                InsertFileTool(),
+                ListDirTool(),
                 ExecTool(),
+                CronTool(
+                    channel_type=self.channel_type,
+                    channel_id=self.channel_id,
+                    session_id=self.session_id,
+                    user_id=self.user_id or "",
+                ),
                 #Terminate(),
             )
         # 登记特殊工具

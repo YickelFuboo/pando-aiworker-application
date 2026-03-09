@@ -26,9 +26,11 @@ class CronPayload:
     任务负载：描述到期后的执行内容。
     - REMIND: 通知用户。用 message；need_deliver/deliver_to/deliver_channel_type 控制推送。
     - AGENT: 调用 Agent。agent_type 指定类型；message 或 extra 可带任务描述。
+    - trigger_session_id: 创建/触发该定时任务的会话 ID，便于溯源与回传。
     """
     kind: CronKind
     message: str = ""
+    trigger_session_id: Optional[str] = None
     need_deliver: bool = False
     deliver_to: Optional[str] = None
     deliver_channel_type: Optional[str] = None

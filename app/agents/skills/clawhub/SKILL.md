@@ -27,7 +27,7 @@ npx --yes clawhub@latest search "web scraping" --limit 5
 ## Install
 
 ```bash
-npx --yes clawhub@latest install <slug> --workdir <WORKSPACE_PATH>
+npx --yes clawhub@latest install <slug> --workdir <WORKSPACE_PATH>/skills
 ```
 
 Replace `<slug>` with the skill name from search results. For `--workdir`, use the **workspace path from your runtime context** (the path shown in "Your workspace is at: ..." in your system prompt). This places the skill into `<workspace>/skills/`, where AI Agent loads workspace skills from. Always include `--workdir`.
@@ -35,7 +35,7 @@ Replace `<slug>` with the skill name from search results. For `--workdir`, use t
 ## Update
 
 ```bash
-npx --yes clawhub@latest update --all --workdir <WORKSPACE_PATH>
+npx --yes clawhub@latest update --all --workdir <WORKSPACE_PATH>/skills
 ```
 
 Use the workspace path from your runtime context for `--workdir`.
@@ -43,7 +43,7 @@ Use the workspace path from your runtime context for `--workdir`.
 ## List installed
 
 ```bash
-npx --yes clawhub@latest list --workdir <WORKSPACE_PATH>
+npx --yes clawhub@latest list --workdir <WORKSPACE_PATH>/skills
 ```
 
 Use the workspace path from your runtime context for `--workdir`.

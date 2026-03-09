@@ -1,0 +1,200 @@
+"""Cron 工具：增/删/改/查定时任务。"""
+from datetime import datetime
+from typing import Any, Dict, Optional
+from app.domains.cron import CRON_MANAGER, CronKind, CronPayload, CronSchedule
+from app.agents.tools.base import BaseTool
+from app.agents.tools.schemes import ToolResult, ToolSuccessResult, ToolErrorResult
+
+
+class CronTool(BaseTool):
+    """定时任务工具：支持 add/list/remove/update。创建任务时使用当前会话上下文作为 deliver_to/trigger_session_id。"""
+
+    def __init__(
+        self,
+        *,
+        channel_type: str = "",
+        channel_id: str = "",
+        session_id: str = "",
+        user_id: str = "",
+    ):
+        self._cron = CRON_MANAGER
+        self._channel_type = channel_type or "cron"
+        self._channel_id = channel_id or ""
+        self._session_id = session_id or ""
+        self._user_id = user_id or ""
+
+    @property
+    def name(self) -> str:
+        return "cron"
+
+    @property
+    def description(self) -> str:
+        return "Schedule reminders and recurring tasks. Actions: add (create), list (query all), remove (delete by job_id), update (enable/disable or set message by job_id)."
+
+    @property
+    def parameters(self) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": ["add", "list", "remove", "update"],
+                    "description": "Action: add=create, list=query all, remove=delete, update=enable/disable or change message",
+                },
+                "message": {
+                    "type": "string",
+                    "description": "Reminder/task message (for add); or new message (for update)",
+                },
+                "every_seconds": {
+                    "type": "integer",
+                    "description": "Interval in seconds for recurring task (for add)",
+                },
+                "cron_expr": {
+                    "type": "string",
+                    "description": "Cron expression e.g. '0 9 * * *' (for add)",
+                },
+                "tz": {
+                    "type": "string",
+                    "description": "IANA timezone for cron e.g. America/Vancouver (for add with cron_expr)",
+                },
+                "at": {
+                    "type": "string",
+                    "description": "ISO datetime for one-time run e.g. 2026-02-12T10:30:00 (for add)",
+                },
+                "job_id": {
+                    "type": "string",
+                    "description": "Job ID (for remove or update)",
+                },
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Enable or disable job (for update)",
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": ["remind", "agent"],
+                    "description": "Task type: remind=notify user, agent=run agent (for add)",
+                },
+                "agent_type": {
+                    "type": "string",
+                    "description": "Agent type when kind=agent (for add)",
+                },
+            },
+            "required": ["action"],
+        }
+
+    async def execute(
+        self,
+        action: str,
+        message: str = "",
+        every_seconds: Optional[int] = None,
+        cron_expr: Optional[str] = None,
+        tz: Optional[str] = None,
+        at: Optional[str] = None,
+        job_id: Optional[str] = None,
+        enabled: Optional[bool] = None,
+        kind: str = "remind",
+        agent_type: Optional[str] = None,
+        **kwargs: Any,
+    ) -> ToolResult:
+        if action == "add":
+            return await self._add(message, every_seconds, cron_expr, tz, at, kind, agent_type)
+        if action == "list":
+            return await self._list()
+        if action == "remove":
+            return await self._remove(job_id)
+        if action == "update":
+            return await self._update(job_id, enabled, message)
+        return ToolErrorResult(f"Unknown action: {action}")
+
+    async def _add(
+        self,
+        message: str,
+        every_seconds: Optional[int],
+        cron_expr: Optional[str],
+        tz: Optional[str],
+        at: Optional[str],
+        kind: str,
+        agent_type: Optional[str],
+    ) -> ToolResult:
+        if not message and kind == "remind":
+            return ToolErrorResult("message is required for add (remind)")
+        if tz and not cron_expr:
+            return ToolErrorResult("tz can only be used with cron_expr")
+        if tz:
+            try:
+                from zoneinfo import ZoneInfo
+                ZoneInfo(tz)
+            except Exception:
+                return ToolErrorResult(f"Unknown timezone: {tz!r}")
+        if not self._session_id:
+            return ToolErrorResult("No session context (session_id) for add")
+
+        delete_after = False
+        if every_seconds is not None and every_seconds > 0:
+            schedule = CronSchedule(kind="every", every_ms=every_seconds * 1000)
+        elif cron_expr:
+            schedule = CronSchedule(kind="cron", expr=cron_expr, tz=tz)
+        elif at:
+            try:
+                dt = datetime.fromisoformat(at.replace("Z", "+00:00"))
+                at_ms = int(dt.timestamp() * 1000)
+            except Exception:
+                return ToolErrorResult(f"Invalid at datetime: {at!r}")
+            schedule = CronSchedule(kind="at", at_ms=at_ms)
+            delete_after = True
+        else:
+            return ToolErrorResult("One of every_seconds, cron_expr, or at is required")
+
+        payload_kind = CronKind.AGENT if kind == "agent" else CronKind.REMIND
+        need_deliver = payload_kind == CronKind.REMIND
+        payload = CronPayload(
+            kind=payload_kind,
+            message=message,
+            trigger_session_id=self._session_id,
+            need_deliver=need_deliver,
+            deliver_to=self._user_id or self._channel_id,
+            deliver_channel_type=self._channel_type,
+            agent_type=agent_type if kind == "agent" else None,
+        )
+        job = await self._cron.add_job(
+            name=(message or "cron")[:30],
+            schedule=schedule,
+            payload=payload,
+            enabled=True,
+            delete_after_run=delete_after,
+        )
+        return ToolSuccessResult(f"Created job '{job.name}' (id: {job.id})")
+
+    async def _list(self) -> ToolResult:
+        jobs = await self._cron.list_jobs()
+        if not jobs:
+            return ToolSuccessResult("No scheduled jobs.")
+        lines = [f"- {j.name} (id: {j.id}, schedule: {j.schedule.kind}, enabled: {j.enabled})" for j in jobs]
+        return ToolSuccessResult("Scheduled jobs:\n" + "\n".join(lines))
+
+    async def _remove(self, job_id: Optional[str]) -> ToolResult:
+        if not job_id:
+            return ToolErrorResult("job_id is required for remove")
+        ok = await self._cron.remove_job(job_id)
+        if ok:
+            return ToolSuccessResult(f"Removed job {job_id}")
+        return ToolErrorResult(f"Job {job_id} not found")
+
+    async def _update(
+        self,
+        job_id: Optional[str],
+        enabled: Optional[bool],
+        message: Optional[str],
+    ) -> ToolResult:
+        if not job_id:
+            return ToolErrorResult("job_id is required for update")
+        job = await self._cron.get_job(job_id)
+        if not job:
+            return ToolErrorResult(f"Job {job_id} not found")
+        if enabled is not None:
+            job.enabled = enabled
+        if message is not None:
+            job.payload.message = message
+        if enabled is not None or message is not None:
+            await self._cron.update_job(job)
+        return ToolSuccessResult(f"Updated job {job_id}")
