@@ -24,17 +24,15 @@ class MCPToolWrapper(BaseTool):
         timeout_seconds: float | None = None,
     ):
         self._mcp_client_session = mcp_client_session
-        self._server_id = server_id
-        self._tool_def = tool_def
         self._timeout = timeout_seconds
-        self._original_name = getattr(tool_def, "name", "") or "mcp_tool"
-        self._name = f"mcp_{server_id}_{self._original_name}"
+        self._original_tool_name = getattr(tool_def, "name", "") or "mcp_tool"
+        self._tool_name = f"mcp_{server_id}_{self._original_tool_name}"
         self._description = getattr(tool_def, "description", None) or ""
         self._parameters = _mcp_tool_to_schema(tool_def)
 
     @property
     def name(self) -> str:
-        return self._name
+        return self._tool_name
 
     @property
     def description(self) -> str:
@@ -47,7 +45,7 @@ class MCPToolWrapper(BaseTool):
     async def execute(self, **kwargs: Any) -> ToolResult:
         try:
             result = await self._mcp_client_session.call_tool(
-                self._original_name,
+                self._original_tool_name,
                 arguments=kwargs if kwargs else None,
                 read_timeout_seconds=self._timeout,
             )
@@ -59,5 +57,5 @@ class MCPToolWrapper(BaseTool):
                 return ToolErrorResult(text)
             return ToolSuccessResult(text)
         except Exception as e:
-            logging.exception(f"MCP tool {self._name} failed: {e}")
+            logging.exception(f"MCP tool {self._tool_name} failed: {e}")
             return ToolErrorResult(str(e))

@@ -2,7 +2,6 @@ import json
 import logging
 import re
 from abc import ABC
-from contextlib import AsyncExitStack
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Tuple
 from enum import Enum
@@ -74,8 +73,7 @@ class ReActAgent(BaseAgent):
         self.available_tools = ToolsFactory()
         self.tool_choices = ToolChoice.AUTO
         self._register_tools()
-        # MCP连接
-        self._mcp_connect_stack: Optional[AsyncExitStack] = None
+        self._mcp_registered = False
 
     def reset(self):
         """重置 agent 状态到初始状态
@@ -97,6 +95,7 @@ class ReActAgent(BaseAgent):
         usable = set(raw.get("usable_tools") or [])
         if not usable or not self.available_tools:
             return
+        
         tools_to_register: List[BaseTool] = []
         if "read_file" in usable:
             tools_to_register.append(ReadFileTool())
@@ -119,18 +118,9 @@ class ReActAgent(BaseAgent):
         if tools_to_register:
             self.available_tools.register_tools(*tools_to_register)
 
-    async def clear(self) -> None:
-        """清理资源"""
-        if self._mcp_connect_stack is not None:
-            try:
-                await self._mcp_connect_stack.aclose()
-            except Exception:
-                pass
-            self._mcp_connect_stack = None
-
-    async def _connect_mcp(self) -> None:
-        """从 .agent/{agent_type}/mcp/mcp_servers.json 加载配置，连接 MCP 服务并将工具注册到 available_tools。"""
-        if self._mcp_connect_stack is not None:
+    async def _mcp_connect_and_register(self) -> None:
+        """从 .agent/{agent_type}/mcp_servers.json 加载配置，经连接池获取/复用 MCP，并将工具注册到 available_tools。"""
+        if self._mcp_registered:
             return
         
         config_path = AGENT_DIR / self.agent_type / MCP_SERVERS_FILENAME
@@ -144,20 +134,13 @@ class ReActAgent(BaseAgent):
         
         servers = raw.get("mcp_servers") or []
         if not servers:
-            return        
+            return
         try:
-            from app.agents.tools.mcp.connector import MCPServerConnector
-            self._mcp_connect_stack = AsyncExitStack()
-            await self._mcp_connect_stack.__aenter__()
-            await MCPServerConnector.connect(servers, self.available_tools, self._mcp_connect_stack)
+            from app.agents.tools.mcp.manager import MCPServerConnector
+            await MCPServerConnector.connect_and_register(servers, self.available_tools)
+            self._mcp_registered = True
         except Exception as e:
             logging.error("Failed to connect MCP servers (will retry next run): %s", e)
-            if self._mcp_connect_stack:
-                try:
-                    await self._mcp_connect_stack.aclose()
-                except Exception:
-                    pass
-                self._mcp_connect_stack = None
 
     def _strip_think(text: str | None) -> str | None:
         """去掉回复中的 <think>...</think> 块（部分思考模型会内嵌），避免把思考过程当正文返回。"""
