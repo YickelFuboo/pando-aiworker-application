@@ -1,6 +1,7 @@
 """
 MCP 连接与注册管理：连接池（按参数复用）+ 按配置将 MCP 工具注册到 ToolsFactory。
 合并原 pool 与 connector 职责，多 Agent 共用同一 MCP Server 时只保留一条连接。
+由后台定时任务关闭空闲超过 IDLE_TIMEOUT_SEC 的连接，下次 get_or_connect 时再重建。
 """
 import asyncio
 import logging
@@ -12,13 +13,19 @@ from app.agents.tools.factory import ToolsFactory
 from app.agents.tools.mcp.tool import MCPToolWrapper
 
 
-class MCPPool:
-    """进程级 MCP 连接池，按连接参数指纹缓存 MCP 会话（stack, session, server_id, timeout_sec, tools）。"""
+IDLE_TIMEOUT_SEC = 300
+CLEANUP_INTERVAL_SEC = 60
 
-    def __init__(self) -> None:
+
+class MCPPool:
+    """进程级 MCP 连接池，按连接参数指纹缓存；后台定时关闭空闲超时的连接。"""
+
+    def __init__(self, idle_timeout_sec: float = IDLE_TIMEOUT_SEC) -> None:
         self._lock = asyncio.Lock()
         self._key_locks: Dict[str, asyncio.Lock] = {}
-        self._sessions: Dict[str, Tuple[AsyncExitStack, Any, str, float, List[Any]]] = {}
+        self._idle_timeout_sec = idle_timeout_sec
+        self._sessions: Dict[str, List[Any]] = {}
+        self._cleanup_task: Optional[asyncio.Task] = None
 
     def _key_lock(self, key: str) -> asyncio.Lock:
         if key not in self._key_locks:
@@ -38,24 +45,29 @@ class MCPPool:
     async def get_or_connect(self, cfg: Dict[str, Any]) -> Optional[Tuple[Any, str, float, List[Any]]]:
         """
         获取或创建连接。返回 (session, server_id, timeout_sec, tool_defs)。
-        相同连接参数复用同一 session；同一 key 并发时由 per-key 锁保证只建一条连接。
+        有缓存则更新 last_used 并返回；无缓存则建连并入库。空闲释放由后台任务负责。
         """
         server_id = cfg.get("id") or cfg.get("name") or "mcp"
         timeout_ms = cfg.get("timeout_ms") or 30000
         timeout_sec = timeout_ms / 1000.0
         allow_tools = cfg.get("tools") or []
         key = self._connection_key(cfg)
+        now = asyncio.get_running_loop().time()
 
         async with self._lock:
             if key in self._sessions:
-                _stack, session, _server_id, _timeout_sec, tools = self._sessions[key]
+                entry = self._sessions[key]
+                _stack, session, _server_id, _timeout_sec, tools = entry[0], entry[1], entry[2], entry[3], entry[4]
+                entry[5] = now
                 return (session, server_id, timeout_sec, self._filter_tools(tools, allow_tools))
             key_lock = self._key_lock(key)
 
         async with key_lock:
             async with self._lock:
                 if key in self._sessions:
-                    _stack, session, _server_id, _timeout_sec, tools = self._sessions[key]
+                    entry = self._sessions[key]
+                    entry[5] = now
+                    _stack, session, _server_id, _timeout_sec, tools = entry[0], entry[1], entry[2], entry[3], entry[4]
                     return (session, server_id, timeout_sec, self._filter_tools(tools, allow_tools))
             try:
                 stack, session, tools = await self._new_connection(cfg, timeout_sec)
@@ -63,7 +75,7 @@ class MCPPool:
                 logging.error("MCP pool connect %s failed: %s", server_id, e)
                 return None
             async with self._lock:
-                self._sessions[key] = (stack, session, server_id, timeout_sec, tools)
+                self._sessions[key] = [stack, session, server_id, timeout_sec, tools, now]
         return (session, server_id, timeout_sec, self._filter_tools(tools, allow_tools))
 
     def _filter_tools(self, tools: List[Any], allow: List[str]) -> List[Any]:
@@ -109,6 +121,42 @@ class MCPPool:
         except Exception:
             await stack.aclose()
             raise
+
+    async def _cleanup_idle(self) -> None:
+        """关闭空闲超过 _idle_timeout_sec 的连接（在持锁外 aclose，避免阻塞）。"""
+        now = asyncio.get_running_loop().time()
+        to_close: List[Tuple[str, AsyncExitStack]] = []
+        async with self._lock:
+            for key, entry in list(self._sessions.items()):
+                if now - entry[5] > self._idle_timeout_sec:
+                    to_close.append((key, entry[0]))
+                    del self._sessions[key]
+        for key, stack in to_close:
+            try:
+                await stack.aclose()
+                logging.debug("MCP pool closed idle connection: %s", key[:80])
+            except Exception as e:
+                logging.warning("MCP pool close idle failed %s: %s", key[:80], e)
+
+    def start_idle_cleanup(self) -> None:
+        """启动后台任务，定期清理空闲连接。应在应用 startup 时调用。"""
+        if self._cleanup_task is not None and not self._cleanup_task.done():
+            return
+
+        async def _loop() -> None:
+            while True:
+                await asyncio.sleep(CLEANUP_INTERVAL_SEC)
+                await self._cleanup_idle()
+
+        self._cleanup_task = asyncio.create_task(_loop())
+        logging.info("MCP pool idle cleanup started, interval=%ss, idle_timeout=%ss", CLEANUP_INTERVAL_SEC, self._idle_timeout_sec)
+
+    def stop_idle_cleanup(self) -> None:
+        """停止后台清理任务。应在应用 shutdown 时调用。"""
+        if self._cleanup_task is None:
+            return
+        self._cleanup_task.cancel()
+        self._cleanup_task = None
 
 
 MCP_POOL = MCPPool()

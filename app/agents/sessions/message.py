@@ -182,7 +182,7 @@ class Message(BaseModel):
             lines.append(self.content.strip())
             lines.append("")
         for tool_call in self.tool_calls or []:
-            lines.append(tool_call.function.name + " executing：")
+            lines.append(tool_call.function.name + " ：")
             args_raw = (tool_call.function.arguments or "").strip()
             try:
                 args_obj = json.loads(args_raw) if args_raw else {}

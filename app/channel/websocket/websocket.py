@@ -53,16 +53,15 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str = None):
                 if parsed.get("type") == "ping":
                     await websocket.send_json(PONG_RESPONSE)
                     continue
-                try:
-                    payload = UserRequest(
-                        content=parsed.get("content", data),
-                        user_id=parsed.get("user_id"),
-                        agent_type=parsed.get("agent_type"),
-                        llm_provider=parsed.get("llm_provider"),
-                        llm_model=parsed.get("llm_model"),
-                    )
-                except Exception:
-                    payload = UserRequest(content=parsed.get("content", data))
+                
+                payload = UserRequest(
+                    session_id=session_id,
+                    content=parsed.get("content"),
+                    user_id=parsed.get("user_id"),
+                    agent_type=parsed.get("agent_type"),
+                    llm_provider=parsed.get("llm_provider"),
+                    llm_model=parsed.get("llm_model"),
+                )
                 inbound_msg = InboundMessage(
                     channel_type="websocket",
                     channel_id=session_id,

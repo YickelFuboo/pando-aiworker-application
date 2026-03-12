@@ -17,6 +17,7 @@ from app.infrastructure.storage import STORAGE_CONN
 from app.infrastructure.vector_store import VECTOR_STORE_CONN
 from app.infrastructure.redis import REDIS_CONN
 from app.agents.bus.queues import MESSAGE_BUS
+from app.agents.tools.mcp.manager import MCP_POOL
 from app.channel.websocket.websocket import router as websocket_router
 from app.domains.cron import CRON_MANAGER
 from app.agents.api import router as agents_router
@@ -94,6 +95,8 @@ async def startup_event():
         app.state.message_bus_task = asyncio.create_task(MESSAGE_BUS.run())
         logging.info("MessageBus 已在后台运行")
 
+        MCP_POOL.start_idle_cleanup()
+
         if settings.run_cron:
             CRON_MANAGER.start()
             logging.info("Cron 调度已启动")
@@ -117,6 +120,8 @@ async def shutdown_event():
         except asyncio.CancelledError:
             pass
         logging.info("MessageBus 已停止")
+
+    MCP_POOL.stop_idle_cleanup()
 
     if settings.run_cron:
         CRON_MANAGER.stop()
