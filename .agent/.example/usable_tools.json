@@ -1,0 +1,11 @@
+{
+  "usable_tools":[
+    "read_file",
+    "write_file",
+    "list_dir",
+    "exec",
+    "web_search",
+    "web_fetch",
+    "cron"
+  ]
+}

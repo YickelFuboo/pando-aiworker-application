@@ -320,11 +320,3 @@ class ReActAgent(BaseAgent):
         except Exception as e:
             logging.error(f"Tool({name}) execution error: {str(e)}")
             raise RuntimeError(f"Tool({name}) execution error: {str(e)}") 
-
-    def get_available_tools(self) -> List[str]:
-        """Get available tools list
-        
-        Returns:
-            List[str]: List of available tools
-        """
-        return list(self.available_tools.keys())

@@ -48,14 +48,14 @@ class MCPPool:
 
         async with self._lock:
             if key in self._sessions:
-                stack, session, server_id, timeout_sec, tools = self._sessions[key]
+                _stack, session, _server_id, _timeout_sec, tools = self._sessions[key]
                 return (session, server_id, timeout_sec, self._filter_tools(tools, allow_tools))
             key_lock = self._key_lock(key)
 
         async with key_lock:
             async with self._lock:
                 if key in self._sessions:
-                    stack, session, server_id, timeout_sec, tools = self._sessions[key]
+                    _stack, session, _server_id, _timeout_sec, tools = self._sessions[key]
                     return (session, server_id, timeout_sec, self._filter_tools(tools, allow_tools))
             try:
                 stack, session, tools = await self._new_connection(cfg, timeout_sec)
@@ -118,7 +118,7 @@ class MCPServerConnector:
     """根据配置从连接池获取或创建 MCP 连接，并将工具注册到 factory。"""
 
     @classmethod
-    async def connect(cls, servers: List[Dict[str, Any]], factory: ToolsFactory) -> None:
+    async def connect_and_register(cls, servers: List[Dict[str, Any]], factory: ToolsFactory) -> None:
         for cfg in servers:
             server_id = cfg.get("id") or cfg.get("name") or "mcp"
             result = await MCP_POOL.get_or_connect(cfg)
@@ -135,8 +135,3 @@ class MCPServerConnector:
                 registered += 1
                 logging.debug("MCP: registered tool %s from server %s", name, server_id)
             logging.info("MCP server %s: session ready, %d tools registered", server_id, registered)
-
-    @classmethod
-    async def connect_and_register(cls, servers: List[Dict[str, Any]], factory: ToolsFactory) -> None:
-        """别名，与 connect 相同。"""
-        await cls.connect(servers, factory)
