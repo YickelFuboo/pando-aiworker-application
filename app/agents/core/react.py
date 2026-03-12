@@ -3,7 +3,9 @@ import logging
 import re
 from typing import Any, List, Literal, Optional, Tuple
 from enum import Enum
-from app.agents.core.base import AGENT_DIR, AgentState, BaseAgent
+from pathlib import Path
+from app.config.settings import PROJECT_BASE_DIR
+from app.agents.core.base import AgentState, BaseAgent
 from app.agents.tools.base import BaseTool
 from app.agents.tools.factory import ToolsFactory
 from app.agents.sessions.message import Message, ToolCall, Function
@@ -16,6 +18,10 @@ from app.agents.tools.local.shell import ExecTool
 from app.agents.tools.local.web import WebSearchTool, WebFetchTool
 from app.agents.tools.local.cron import CronTool
 
+
+# 当前文件所在目录（各技能为子目录，如 memory/SKILL.md）
+AGENT_DIR = Path(PROJECT_BASE_DIR) / ".agent"
+WORKSPACE_DIR = Path(PROJECT_BASE_DIR) / "data" / ".workspace"
 
 # MCP 配置：.agent/{agent_type}/mcp_servers.json
 MCP_SERVERS_FILENAME = "mcp_servers.json"
@@ -73,6 +79,13 @@ class ReActAgent(BaseAgent):
         self.tool_choices = ToolChoice.AUTO
         self._register_tools()
         self._mcp_registered = False
+
+        # 设置工作空间路径        
+        self.agent_path = str(AGENT_DIR / agent_type)
+        if agent_type == "AiAssistant":
+            self.workspace_path = str(WORKSPACE_DIR / self.user_id / self.agent_type)
+        else:
+            self.workspace_path = str(WORKSPACE_DIR / "default")
 
     def reset(self):
         """重置 agent 状态到初始状态

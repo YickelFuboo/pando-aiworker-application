@@ -1,11 +1,9 @@
 import logging
 from abc import ABC
 from enum import Enum
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 from app.agents.sessions.manager import SESSION_MANAGER
 from app.agents.sessions.message import Role, Message
-from app.config.settings import PROJECT_BASE_DIR
 
 
 class AgentState(str, Enum):
@@ -16,9 +14,6 @@ class AgentState(str, Enum):
     ERROR = "ERROR"  # Error state
     FINISHED = "FINISHED"  # Finished state
 
-# 当前文件所在目录（各技能为子目录，如 memory/SKILL.md）
-AGENT_DIR = Path(PROJECT_BASE_DIR) / ".agent"
-WORKSPACE_DIR = Path(PROJECT_BASE_DIR) / "data" / ".workspace"
 
 class BaseAgent(ABC):
     """Base Agent class
@@ -74,10 +69,7 @@ class BaseAgent(ABC):
         self.current_step = 0
         self.max_steps = max_steps or 50
         self.max_duplicate_steps = max_duplicate_steps or 2   # 最大重复次数，用于检验当前项agent是否挂死
-
-        # Agent 目录与工作空间路径
-        self.agent_path = str(AGENT_DIR / agent_type)
-        self.workspace_path = str(WORKSPACE_DIR / self.user_id / self.agent_type)
+        
 
     def reset(self):
         """重置 agent 状态到初始状态

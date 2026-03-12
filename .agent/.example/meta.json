@@ -1,0 +1,6 @@
+{
+  "name_zh": "AI助手",
+  "name_en": "AI Assistant",
+  "description_zh": "智能对话与任务执行助手，支持代码编辑、文件操作、检索与定时任务。",
+  "description_en": "Intelligent conversation and task execution assistant with code, file, search and cron support."
+}
