@@ -21,6 +21,7 @@ from app.agents.tools.local.cron import CronTool
 
 # MCP 配置：.agent/{agent_type}/mcp_servers.json
 MCP_SERVERS_FILENAME = "mcp_servers.json"
+USABLE_TOOLS_FILENAME = "usable_tools.json"
 
 
 class ToolChoice(str, Enum):
@@ -82,6 +83,41 @@ class ReActAgent(BaseAgent):
         """
         super().reset()
         logging.info(f"ReActAgent state reset to IDLE")
+
+    def _register_tools(self) -> None:
+        """根据 .agent/{agent_type}/usable_tools.json 注册工具，仅注册配置中列出的项。"""
+        config_path = AGENT_DIR / self.agent_type / USABLE_TOOLS_FILENAME
+        if not config_path.is_file():
+            return
+        try:
+            raw = json.loads(config_path.read_text(encoding="utf-8"))
+        except Exception as e:
+            logging.warning("Failed to load usable tools config %s: %s", config_path, e)
+            return
+        usable = set(raw.get("usable_tools") or [])
+        if not usable or not self.available_tools:
+            return
+        tools_to_register: List[BaseTool] = []
+        if "read_file" in usable:
+            tools_to_register.append(ReadFileTool())
+        if "write_file" in usable:
+            tools_to_register.append(WriteFileTool())
+        if "release_file_text" in usable:
+            tools_to_register.append(ReleaseFileTextTool())
+        if "insert_file" in usable:
+            tools_to_register.append(InsertFileTool())
+        if "list_dir" in usable:
+            tools_to_register.append(ListDirTool())
+        if "exec" in usable:
+            tools_to_register.append(ExecTool())
+        if "web_search" in usable:
+            tools_to_register.append(WebSearchTool())
+        if "web_fetch" in usable:
+            tools_to_register.append(WebFetchTool())
+        if "cron" in usable:
+            tools_to_register.append(CronTool(session_id=self.session_id, user_id=self.user_id))
+        if tools_to_register:
+            self.available_tools.register_tools(*tools_to_register)
 
     async def clear(self) -> None:
         """清理资源"""
