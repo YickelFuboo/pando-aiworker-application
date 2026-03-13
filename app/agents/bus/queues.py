@@ -2,7 +2,7 @@ import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 
 @dataclass
@@ -31,13 +31,23 @@ class OutboundMessage:
     media: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
 
+@dataclass
+class AgentEntry:
+    """池条目：实例 + 最后复用时间（类型用 agent.agent_type，运行态由 running_agent_pool 表示）。"""
+    agent: Any
+    last_used_at: float = 0.0
 
-ChannelOutboundCallback = Callable[[OutboundMessage], None]
-CHANNEL_OUTBOUND_CALLBACKS: Dict[str, ChannelOutboundCallback] = {}
+# Agent 池相关配置
+AGENT_POOL_IDLE_TTL_SEC = 300
+AGENT_POOL_CLEANUP_INTERVAL_SEC = 60
 
+# 消息池相关配置
 SESSION_MAILBOX_MAXSIZE = 50
 SESSION_IDLE_TTL_SEC = 1800
 GLOBAL_RUN_CONCURRENCY = 32
+ChannelOutboundCallback = Callable[[OutboundMessage], None]
+CHANNEL_OUTBOUND_CALLBACKS: Dict[str, ChannelOutboundCallback] = {}
+
 
 class MessageBus:
     def __init__(self):
@@ -48,11 +58,16 @@ class MessageBus:
         # - _session_workers: 每个 session 一个 worker 协程任务，循环消费 mailbox 并执行（天然串行）
         # - _session_last_active_at: 记录 session 最近一次收到消息的时间，用于 idle TTL 回收资源
         # - _session_lock: 保护上述 dict 的并发读写，避免并发分发时重复创建 mailbox/worker
-        self._session_mailboxes: Dict[str, asyncio.Queue[InboundMessage]] = {}
-        self._session_workers: Dict[str, asyncio.Task] = {}
-        self._session_last_active_at: Dict[str, float] = {}
+        self._session_mailboxes: Dict[str, asyncio.Queue[InboundMessage]] = {}  # key是session_id，value是asyncio.Queue[InboundMessage]
+        self._session_workers: Dict[str, asyncio.Task] = {}  # key是session_id，value是asyncio.Task
+        self._session_last_active_at: Dict[str, float] = {}  
         self._session_lock = asyncio.Lock()
         self._global_run_semaphore = asyncio.Semaphore(GLOBAL_RUN_CONCURRENCY)
+
+        # Agent 池：
+        self.running_agent_pool: Dict[str, Any] = {}  # key是session_id，value是agent
+        self.free_agent_pool: Dict[str, List[AgentEntry]] = {}
+        self._agent_pool_lock = asyncio.Lock()
 
     async def push_inbound(self, msg: InboundMessage) -> None:
         """Publish a message from a channel to the agent."""
@@ -88,9 +103,34 @@ class MessageBus:
         """Number of pending outbound messages."""
         return self.outbound.qsize()
 
+    @property
+    def running_agent_count(self) -> int:
+        """当前运行中的 Agent 数量。"""
+        return len(self.running_agent_pool)
+    
+    def _get_status_text(self) -> str:
+        """生成 /status 的回复文案。"""
+        in_cnt = self.inbound_size
+        mailbox_total = 0
+        for q in self._session_mailboxes.values():
+            mailbox_total += q.qsize()
+        out_cnt = self.outbound_size
+        run_cnt = self.running_agent_count
+        return (
+            f"**消息总线状态**\n"
+            f"- in 通道待处理: {in_cnt}\n"
+            f"- 各 session 收件箱待处理: {mailbox_total}\n"
+            f"- out 通道待处理: {out_cnt}\n"
+            f"- 已运行态 Agent 数量: {run_cnt}"
+        )
+
     async def run(self) -> None:
-        """Run the message bus：inbound 与 outbound 两路循环并发执行。"""
-        await asyncio.gather(self._run_inbound_loop(), self._run_outbound_loop())
+        """Run the message bus：inbound、outbound 与 Agent 池清理三路并发。"""
+        await asyncio.gather(
+            self._run_inbound_loop(),
+            self._run_outbound_loop(),
+            self._run_agent_pool_cleanup_loop(),
+        )
 
     async def _run_inbound_loop(self) -> None:
         """循环消费 inbound：按 session_id 路由到 mailbox，由各 session worker 串行执行。"""
@@ -167,40 +207,83 @@ class MessageBus:
                     pass
 
     async def _handle_inbound(self, inbound_msg: InboundMessage) -> None:
-        """处理单条 inbound：更新 session 信息 + 复用/创建 agent 串行执行。"""
+        """处理单条 inbound：/status、/stop 命令或更新 session + 复用/创建 agent 执行。"""
         from app.agents.sessions.manager import SESSION_MANAGER
         from app.agents.core.react import ReActAgent
 
         session_id = inbound_msg.session_id
         if not session_id:
-           raise ValueError("Session ID is required")
-        
+            raise ValueError("Session ID is required")
+
+        content_stripped = (inbound_msg.content or "").strip()
+        if content_stripped == "/status":
+            status_text = self._get_status_text()
+            await self.push_outbound(OutboundMessage(
+                channel_type=inbound_msg.channel_type,
+                channel_id=inbound_msg.channel_id,
+                user_id=inbound_msg.user_id,
+                session_id=session_id,
+                content=status_text,
+            ))
+            return
+        if content_stripped == "/stop":
+            agent = self.running_agent_pool.get(session_id)
+            if agent:
+                agent.force_stop()
+                reply = "已发送停止请求，当前任务将在当前步骤结束后停止。"
+            else:
+                reply = "当前没有正在运行的 Agent。"
+            await self.push_outbound(OutboundMessage(
+                channel_type=inbound_msg.channel_type,
+                channel_id=inbound_msg.channel_id,
+                user_id=inbound_msg.user_id,
+                session_id=session_id,
+                content=reply,
+            ))
+            return
+
         session = await SESSION_MANAGER.get_session(session_id)
         if not session:
             raise ValueError("Session not found")
 
         metadata = dict(inbound_msg.metadata) if inbound_msg.metadata else {}
         await SESSION_MANAGER.update_session(
-            session_id, 
-            description=session.description if session.description else inbound_msg.content[:20],
+            session_id,
+            description=session.description if session.description else (inbound_msg.content or "")[:20],
             channel_type=inbound_msg.channel_type,
             agent_type=inbound_msg.agent_type,
             llm_provider=inbound_msg.llm_provider,
             llm_model=inbound_msg.llm_model,
             metadata=metadata,
-        ) 
+        )
 
-        agent = ReActAgent(
-            agent_type=inbound_msg.agent_type,
+        agent_type = inbound_msg.agent_type
+        agent = await self._acquire_agent_from_pool(
+            agent_type=agent_type,
+            session_id=session_id,
             channel_type=inbound_msg.channel_type,
             channel_id=inbound_msg.channel_id,
-            session_id=session_id,
             user_id=inbound_msg.user_id,
-            content=inbound_msg.content,
-            llm_provider=inbound_msg.llm_provider,
-            llm_model=inbound_msg.llm_model)
+            llm_provider=inbound_msg.llm_provider or "",
+            llm_model=inbound_msg.llm_model or "",
+        )
+        if agent is None:
+            agent = ReActAgent(
+                agent_type=agent_type,
+                channel_type=inbound_msg.channel_type,
+                channel_id=inbound_msg.channel_id,
+                session_id=session_id,
+                user_id=inbound_msg.user_id,
+                llm_provider=inbound_msg.llm_provider,
+                llm_model=inbound_msg.llm_model,
+            )
 
-        await agent.run(inbound_msg.content)
+        try:
+            self.running_agent_pool[session_id] = agent
+            await agent.run(inbound_msg.content or "")
+        finally:
+            self.running_agent_pool.pop(session_id, None)
+            await self._add_agent_to_free_pool(agent)
 
     async def _run_outbound_loop(self) -> None:
         """循环消费 outbound，按 channel_type 回调发送。"""
@@ -211,5 +294,50 @@ class MessageBus:
                 callback(outbound_msg)
             else:
                 logging.warning("No outbound callback for channel_type=%s", outbound_msg.channel_type)
+    
+    async def _acquire_agent_from_pool(
+        self, agent_type: str, session_id: str, channel_type: str, channel_id: str,
+        user_id: str, llm_provider: str, llm_model: str
+    ) -> Optional[Any]:
+        """从 free_agent_pool 取一个同类型空闲 Agent 并更新为当前会话参数，若无则返回 None。"""
+        async with self._agent_pool_lock:
+            entries = self.free_agent_pool.get(agent_type, [])
+            if not entries:
+                return None
+            entry = entries.pop(0)
+            agent = entry.agent
+            agent.session_id = session_id
+            agent.channel_type = channel_type
+            agent.channel_id = channel_id
+            agent.user_id = user_id
+            agent.llm_provider = llm_provider or (agent.llm_provider or "")
+            agent.llm_model = llm_model or (agent.llm_model or "")
+            agent.reset()
+            return agent
+
+    async def _add_agent_to_free_pool(self, agent: Any) -> None:
+        """按当前 agent 新建 AgentEntry 并加入 free_agent_pool（复用与新建统一走此逻辑）。"""
+        entry = AgentEntry(
+            agent=agent,
+            last_used_at=asyncio.get_running_loop().time(),
+        )
+        agent_type = agent.agent_type
+        async with self._agent_pool_lock:
+            if agent_type not in self.free_agent_pool:
+                self.free_agent_pool[agent_type] = []
+            self.free_agent_pool[agent_type].append(entry)
+
+    async def _run_agent_pool_cleanup_loop(self) -> None:
+        """定期清理 free_agent_pool 中超过 AGENT_POOL_IDLE_TTL_SEC 未复用的 Agent。"""
+        while True:
+            await asyncio.sleep(AGENT_POOL_CLEANUP_INTERVAL_SEC)
+            now = asyncio.get_running_loop().time()
+            async with self._agent_pool_lock:
+                for agent_type in list(self.free_agent_pool.keys()):
+                    entries = self.free_agent_pool[agent_type]
+                    kept = [e for e in entries if (now - e.last_used_at) <= AGENT_POOL_IDLE_TTL_SEC]
+                    self.free_agent_pool[agent_type] = kept
+                    if not kept:
+                        self.free_agent_pool.pop(agent_type, None)
 
 MESSAGE_BUS = MessageBus()

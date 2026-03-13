@@ -65,11 +65,15 @@ class BaseAgent(ABC):
         self.params = kwargs
 
         # 执行步数相关
-        self.state = AgentState.IDLE
-        self.current_step = 0
-        self.max_steps = max_steps or 50
-        self.max_duplicate_steps = max_duplicate_steps or 2   # 最大重复次数，用于检验当前项agent是否挂死
-        
+        self._state = AgentState.IDLE
+        self._current_step = 0
+        self._max_steps = max_steps or 50
+        self._max_duplicate_steps = max_duplicate_steps or 2   # 最大重复次数，用于检验当前项agent是否挂死
+        self._stop_requested = False
+
+    def force_stop(self) -> None:
+        """强制当前运行中的 Agent 停止（由外部如 /stop 命令调用）。"""
+        self._stop_requested = True
 
     def reset(self):
         """重置 agent 状态到初始状态
@@ -79,8 +83,9 @@ class BaseAgent(ABC):
         - 当前步数归零
         """
         try:
-            self.state = AgentState.IDLE
-            self.current_step = 0
+            self._state = AgentState.IDLE
+            self._current_step = 0
+            self._stop_requested = False
         except Exception as e:
             logging.error(f"Error in agent reset: {str(e)}")
             raise e
@@ -120,7 +125,7 @@ class BaseAgent(ABC):
             if msg.role == Role.ASSISTANT and msg.content == last_message.content
         )
 
-        return duplicate_count >= self.max_duplicate_steps
+        return duplicate_count >= self._max_duplicate_steps
 
     def get_state(self) -> AgentState:
         """Get current state
@@ -128,7 +133,7 @@ class BaseAgent(ABC):
         Returns:
             AgentState: Current state
         """
-        return self.state
+        return self._state
 
     async def get_history_messages(self) -> List[Message]:
         """Get messages from session"""

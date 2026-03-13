@@ -88,13 +88,6 @@ class ReActAgent(BaseAgent):
         else:
             self.workspace_path = str(WORKSPACE_DIR / "default")
 
-    def reset(self):
-        """重置 agent 状态到初始状态
-        - 工具调用状态清空
-        """
-        super().reset()
-        logging.info(f"ReActAgent state reset to IDLE")
-
     def _register_tools(self) -> None:
         """根据 .agent/{agent_type}/usable_tools.json 注册工具，仅注册配置中列出的项。"""
         config_path = AGENT_DIR / self.agent_type / USABLE_TOOLS_FILENAME
@@ -174,8 +167,8 @@ class ReActAgent(BaseAgent):
             raise ValueError("Session ID is required")
         
         # 检查并重置状态
-        if self.state != AgentState.IDLE:
-            logging.warning(f"Agent is busy with state {self.state}, resetting...")
+        if self._state != AgentState.IDLE:
+            logging.warning(f"Agent is busy with state {self._state}, resetting...")
             self.reset()
         
 
@@ -192,12 +185,12 @@ class ReActAgent(BaseAgent):
             await self._register_mcp_tools()
 
             # 设置运行状态
-            self.state = AgentState.RUNNING
+            self._state = AgentState.RUNNING
 
             # 设置添加用户消息到history标志
             had_push_user_message = False
-            while (self.current_step < self.max_steps and self.state != AgentState.FINISHED):
-                self.current_step += 1
+            while (self._current_step < self._max_steps and self._state != AgentState.FINISHED and not self._stop_requested):
+                self._current_step += 1
 
                 # 模型思考和工具调度
                 content, tool_calls = await self.think(llm, question)
@@ -211,7 +204,7 @@ class ReActAgent(BaseAgent):
                     if not had_push_user_message:
                         await self.push_history_message(Message.user_message(original_question))
                         had_push_user_message = True
-                    await self.push_history_message_and_notify_user(Message.tool_call_message(content, tool_calls))    
+                    await self.push_history_message_and_notify_user(Message.tool_call_message(content, tool_calls))
                     await self.act(tool_calls)
 
                 # 检查模型是否进行死循环
@@ -222,12 +215,12 @@ class ReActAgent(BaseAgent):
                 question = self.next_step_prompt
 
             # 检查终止原因并重置状态
-            if self.current_step >= self.max_steps:
-                content += f"\n\n Terminated: Reached max steps ({self.max_steps})"
+            if self._current_step >= self._max_steps:
+                content += f"\n\n Terminated: Reached max steps ({self._max_steps})"
      
             return content
         except Exception as e:
-            self.state = AgentState.ERROR
+            self._state = AgentState.ERROR
             await self.push_history_message_and_notify_user(Message.assistant_message(f"Error in agent execution: {str(e)}"))
             raise
         finally:
