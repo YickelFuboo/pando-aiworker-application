@@ -108,21 +108,32 @@ class MessageBus:
         """当前运行中的 Agent 数量。"""
         return len(self.running_agent_pool)
     
-    def _get_status_text(self) -> str:
-        """生成 /status 的回复文案。"""
+    def _get_status_text(self, session_id: Optional[str] = None) -> str:
+        """生成 /status 的回复文案；若传入 session_id 则包含该 Session 待处理消息数。"""
         in_cnt = self.inbound_size
         mailbox_total = 0
-        for q in self._session_mailboxes.values():
-            mailbox_total += q.qsize()
+        current_session_pending_cnt = 0
+        for sid, q in self._session_mailboxes.items():
+            n = q.qsize()
+            mailbox_total += n
+            if session_id and sid == session_id:
+                current_session_pending_cnt = n
         out_cnt = self.outbound_size
         run_cnt = self.running_agent_count
-        return (
-            f"**消息总线状态**\n"
-            f"- in 通道待处理: {in_cnt}\n"
-            f"- 各 session 收件箱待处理: {mailbox_total}\n"
-            f"- out 通道待处理: {out_cnt}\n"
-            f"- 已运行态 Agent 数量: {run_cnt}"
-        )
+        current_session_run_cnt = 0
+        if session_id:
+            current_session_run_cnt = len(self.running_agent_pool.get(session_id, []))
+        lines = [
+            "**消息总线状态**",
+            f"- in 通道待处理: {in_cnt}",
+            f"- out 通道待处理: {out_cnt}",
+            f"- 所有会话 in 通道待处理: {mailbox_total}",
+            f"- 当前会话 in 通道待处理: {current_session_pending_cnt}",
+            "**Agent运行状态**",
+            f"- 运行态 Agent 数量: {run_cnt}",
+            f"- 当前会话运行态 Agent 数量: {current_session_run_cnt}",
+        ]
+        return "\n".join(lines)
 
     async def run(self) -> None:
         """Run the message bus：inbound、outbound 与 Agent 池清理三路并发。"""
@@ -142,7 +153,7 @@ class MessageBus:
             # 系统命令直接处理不排队
             content_stripped = (inbound_msg.content or "").strip()
             if content_stripped == "/status":
-                status_text = self._get_status_text()
+                status_text = self._get_status_text(session_id=inbound_msg.session_id)
                 await self.push_outbound(OutboundMessage(
                     channel_type=inbound_msg.channel_type,
                     channel_id=inbound_msg.channel_id,
