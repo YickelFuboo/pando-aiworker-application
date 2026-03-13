@@ -5,7 +5,7 @@ from typing import Any
 from urllib.parse import urlparse
 import httpx
 from readability import Document
-from app.infrastructure.web_search import BraveSearch
+from app.infrastructure.web_search.tavily import TavilySearch   
 from ..base import BaseTool
 from ..schemes import ToolResult, ToolSuccessResult, ToolErrorResult
 
@@ -39,11 +39,11 @@ def _validate_url(url: str) -> tuple[bool, str]:
 
 
 class WebSearchTool(BaseTool):
-    """Brave Web 搜索工具，返回标题、URL 与摘要。"""
+    """Tavily Web 搜索工具，返回标题、URL 与摘要。"""
 
     def __init__(self, max_results: int = 5) -> None:
         self.max_results = max_results
-        self._client = BraveSearch()
+        self._client = TavilySearch()
 
     @property
     def name(self) -> str:
@@ -79,9 +79,9 @@ class WebSearchTool(BaseTool):
             n = self.max_results
 
         try:
-            results = await self._client.search(query=query, count=n)
+            results = await self._client.search(query)
         except Exception as e:
-            return ToolErrorResult(f"Error calling BraveSearch: {e}")
+            return ToolErrorResult(f"Error calling Tavily: {e}")
 
         if not results:
             return ToolSuccessResult(f"No results for: {query}")
@@ -90,7 +90,7 @@ class WebSearchTool(BaseTool):
         for i, item in enumerate(results[:n], 1):
             title = item.get("title", "")
             url = item.get("url", "")
-            desc = item.get("description", "")
+            desc = item.get("content", "")
             lines.append(f"{i}. {title}\n   {url}")
             if desc:
                 lines.append(f"   {desc}")
@@ -136,12 +136,12 @@ class WebFetchTool(BaseTool):
             "required": ["url"],
         }
 
-    async def execute(self, url: str, extractMode: str = "markdown", maxChars: int | None = None, **kwargs: Any) -> str:
+    async def execute(self, url: str, extractMode: str = "markdown", maxChars: int | None = None, **kwargs: Any) -> ToolResult:
         max_chars = maxChars or self.max_chars
 
         is_valid, error_msg = _validate_url(url)
         if not is_valid:
-            return json.dumps({"error": f"URL validation failed: {error_msg}", "url": url}, ensure_ascii=False)
+            return ToolErrorResult(json.dumps({"error": f"URL validation failed: {error_msg}", "url": url}, ensure_ascii=False))
 
         try:
             async with httpx.AsyncClient(
@@ -168,7 +168,7 @@ class WebFetchTool(BaseTool):
             if truncated:
                 text = text[:max_chars]
 
-            return json.dumps(
+            result_str = json.dumps(
                 {
                     "url": url,
                     "finalUrl": str(r.url),
@@ -180,8 +180,9 @@ class WebFetchTool(BaseTool):
                 },
                 ensure_ascii=False,
             )
+            return ToolSuccessResult(result_str)
         except Exception as e:
-            return json.dumps({"error": str(e), "url": url}, ensure_ascii=False)
+            return ToolErrorResult(json.dumps({"error": str(e), "url": url}, ensure_ascii=False))
 
     def _to_markdown(self, html: str) -> str:
         text = re.sub(

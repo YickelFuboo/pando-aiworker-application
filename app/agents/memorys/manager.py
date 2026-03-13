@@ -156,11 +156,10 @@ class MemoryManager:
         content: str,
     ) -> None:
         """工作空间记忆合并：提炼到 .workspace/<workspace_index>/memory/memory.md。"""
-        system_prompt=MemoryExtractPrompt.for_workspace().system_prompt,
+        system_prompt = MemoryExtractPrompt.for_workspace().system_prompt
         current_memory = await self._read_file(self._workspace_memory)
         user_content = f"## Current Workspace Memory\n{current_memory or '(empty)'}\n\n## Content to Process\n{content}"
         user_question = f"{MemoryExtractPrompt.for_workspace().user_instruction}\n\n{user_content}"
-
         memory_update, history_entry = await self._extract(
             system_prompt=system_prompt,
             user_question=user_question

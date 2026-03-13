@@ -67,6 +67,7 @@ class ClaudeModels(OpenAIBase):
                   user_prompt: str,
                   user_question: str,
                   history: List[Dict[str, Any]] = None,
+                  with_think: Optional[bool] = False,
                   **kwargs) -> Tuple[ChatResponse, int]:
         """Claude风格的聊天实现，支持失败重试"""
         messages = self._format_message(
@@ -76,9 +77,7 @@ class ClaudeModels(OpenAIBase):
         # 构建参数
         params = {
             "model": self.model_name,
-            "messages": messages,
-            "temperature": kwargs.get("temperature", self.configs.get("temperature", 0.7)),
-            "max_tokens": kwargs.get("max_tokens", self.configs.get("max_tokens", 2048))
+            "messages": messages
         }
         # 添加其他参数，避免重复
         for key, value in kwargs.items():
@@ -133,6 +132,7 @@ class ClaudeModels(OpenAIBase):
                   user_prompt: str,
                   user_question: str,
                   history: List[Dict[str, Any]] = None,
+                  with_think: Optional[bool] = False,
                   **kwargs) -> Tuple[AsyncGenerator[str, None], int]:
         """Claude风格的流式聊天实现，支持失败重试"""
         messages = self._format_message(
@@ -143,9 +143,7 @@ class ClaudeModels(OpenAIBase):
         params = {
             "model": self.model_name,
             "messages": messages,
-            "stream": True,
-            "temperature": kwargs.get("temperature", self.configs.get("temperature", 0.7)),
-            "max_tokens": kwargs.get("max_tokens", self.configs.get("max_tokens", 2048))
+            "stream": True
         }
         # 添加其他参数，避免重复
         for key, value in kwargs.items():
@@ -214,6 +212,7 @@ class ClaudeModels(OpenAIBase):
                        history: List[Dict[str, Any]] = None,
                        tools: Optional[List[dict]] = None,
                        tool_choice: Literal["none", "auto", "required"] = "auto",
+                       with_think: Optional[bool] = False,
                        **kwargs) -> Tuple[AskToolResponse, int]:
         """Claude风格的工具调用实现，支持失败重试"""
         if tool_choice == "required" and not tools:
@@ -228,9 +227,7 @@ class ClaudeModels(OpenAIBase):
         
         params = {
             "model": self.model_name,
-            "messages": messages,
-            "temperature": kwargs.get("temperature", self.configs.get("temperature", 0.7)),
-            "max_tokens": kwargs.get("max_tokens", self.configs.get("max_tokens", 2048))
+            "messages": messages
         }
 
         if tools and tool_choice != "none":
@@ -313,6 +310,7 @@ class ClaudeModels(OpenAIBase):
                        history: List[Dict[str, Any]] = None,
                        tools: Optional[List[dict]] = None,
                        tool_choice: Literal["none", "auto", "required"] = "auto",
+                       with_think: Optional[bool] = False,
                        **kwargs) -> Tuple[AsyncGenerator[str, None], int]:
         """Claude风格的工具调用流式实现，支持失败重试"""
         if tool_choice == "required" and not tools:
@@ -325,9 +323,7 @@ class ClaudeModels(OpenAIBase):
         params = {
             "model": self.model_name,
             "messages": messages,
-            "stream": True,
-            "temperature": kwargs.get("temperature", self.configs.get("temperature", 0.7)),
-            "max_tokens": kwargs.get("max_tokens", self.configs.get("max_tokens", 2048))
+            "stream": True
         }
 
         if tools and tool_choice != "none":

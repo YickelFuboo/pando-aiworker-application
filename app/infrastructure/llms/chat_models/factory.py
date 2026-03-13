@@ -7,6 +7,7 @@ from app.infrastructure.llms.chat_models.openai_llm import OpenAIModels
 from app.infrastructure.llms.chat_models.qwen_llm import QwenModels
 from app.infrastructure.llms.chat_models.siliconflow_llm import SiliconFlowModels
 from app.infrastructure.llms.chat_models.fuyao_llm import FuYaoModels
+from app.infrastructure.llms.chat_models.zhipu_llm import ZhiPuModels
 
 # =============================================================================
 # 聊天模型工厂
@@ -24,6 +25,7 @@ class LLMFactory(BaseModelFactory):
             "qwen": QwenModels,
             "siliconflow": SiliconFlowModels,
             "fuyao": FuYaoModels,
+            "zhipu": ZhiPuModels,
         }
     
     def __init__(self):

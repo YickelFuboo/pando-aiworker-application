@@ -51,9 +51,10 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str = None):
                     parsed = {"content": data}
 
                 if parsed.get("type") == "ping":
+                    logging.error(f"WebSocket ping received from {session_id}")
                     await websocket.send_json(PONG_RESPONSE)
                     continue
-                
+
                 payload = UserRequest(
                     session_id=session_id,
                     content=parsed.get("content"),

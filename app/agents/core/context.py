@@ -12,7 +12,7 @@ from ..memorys.manager import MemoryManager
 
 
 # Agent 目录下引导文件所在子目录（.agent/agent_type/prompt）
-AGENT_CONTEXT_PATH = "prompt"
+AGENT_CONTEXT_PATH = "prompts"
 # 会被读入 system prompt 的引导文件名（按顺序，存在则读）
 AGENT_CONTEXT_FILES = ["AGENT.md", "SOUL.md", "USER.md", "TOOLS.md", "IDENTITY.md", "RUNTIME.md"]
 

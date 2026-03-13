@@ -1,72 +1,36 @@
+from typing import Dict, List, Literal, Union, AsyncGenerator, Any, Tuple, Optional
 import asyncio
 import json
-import httpx
+import time
 import logging
-from typing import Dict, Optional, List, Literal, Union, AsyncGenerator, Any, Tuple
-from openai import OpenAI
-from app.infrastructure.llms.chat_models.base.base import CONNECTION_TIMEOUT, MAX_RETRY_ATTEMPTS
+from zai import ZhipuAiClient
 from app.infrastructure.llms.chat_models.base.base import LLM, MAX_RETRY_ATTEMPTS
 from app.infrastructure.llms.chat_models.schemes import ChatResponse, AskToolResponse, ToolInfo
 from app.infrastructure.llms.utils import num_tokens_from_string
+from app.infrastructure.llms.chat_models.base.openai_base import OpenAIBase
 
 
-class FuYaoModels(LLM):
-    """OpenAI兼容API的通用实现（适用于OpenAI、DeepSeek、Qwen等）"""
-    def __init__(self, api_key: str, model_name: str, base_url: str, language: str = "Chinese", **kwargs):
-        """初始化fuyao平台的兼容的聊天模型
+class ZhiPuModels(OpenAIBase):
+    """智谱AI模型系列"""
+    
+    def __init__(self, api_key: str, model_name: str = "glm-5", base_url: Optional[str] = None, language: str = "Chinese", **kwargs):
+        """
+        初始化智谱AI模型
+        
         Args:
-            api_key (str): OpenAI API密钥
-            model_name (str): 模型名称，默认为gpt-4o
-            base_url (str): API基础URL，默认为OpenAI官方API
+            api_key (str): 智谱AI API密钥
+            model_name (str): 模型名称，默认为glm-5
+            base_url (str): API基础URL，默认为智谱AI官方API
             language (str): 语言设置
             **kwargs: 其他参数
         """
         super().__init__(api_key, model_name, base_url, language, **kwargs)
         
-        # 创建OpenAI客户端
-        transport = httpx.HTTPTransport(proxy=None, verify=False)
-        http_client = httpx.Client(transport=transport)
-
-
-        self.client = OpenAI(
-            base_url=base_url,
+        # 创建智谱AI客户端
+        self.client = ZhipuAiClient(
             api_key=api_key,
-            http_client=http_client
         )
 
-    def _format_message(
-        self,
-        system_prompt: str, 
-        user_prompt: str, 
-        user_question: str,
-        history: Optional[List[Dict[str, Any]]] = None
-    ) -> List[Dict[str, Any]]:
-        """格式化消息为 OpenAI API 所需的格式"""
-        try:
-            messages = []
-
-            # 添加系统提示信息
-            if system_prompt:
-                messages.append({"role": "system", "content": system_prompt})
-            
-            # 添加对话历史
-            if history:
-                messages.extend(history)
- 
-            # 添加用户问题信息
-            if user_question:
-                user_message = f"{user_prompt}\n{user_question}" if user_prompt else user_question
-                messages.append({"role": "user", "content": user_message})
-
-            if not messages:
-                logging.error("Messages are empty")
-                raise ValueError("Messages are empty")
-        
-            return messages
-        except Exception as e:
-            logging.error(f"Error in _format_openai_message: {e}")
-            raise e
-    
     async def chat(self, 
                   system_prompt: str,
                   user_prompt: str,
@@ -85,27 +49,14 @@ class FuYaoModels(LLM):
         for key, value in kwargs.items():
             if key not in params:
                 params[key] = value
-
-        # 添加扩展参数
-        extra_headers = {
-            "X-HW-ID": "",
-            "X-HW-APPKEY": ""
-        }
-        extra_body = {
-            "model": self.model_name,
-            "scene": "",
-            "operator": ""
-        }
         
         # 实现重试策略
         for attempt in range(MAX_RETRY_ATTEMPTS):
             try:
                 response = await asyncio.to_thread(
                     self.client.chat.completions.create,
-                    model=self.model_name, 
-                    messages=messages, 
-                    extra_headers=extra_headers,
-                    extra_body=extra_body,
+                    model=self.model_name,
+                    messages=messages,
                     **params
                 )
                 
@@ -169,27 +120,14 @@ class FuYaoModels(LLM):
             if key not in params:
                 params[key] = value
 
-        # 添加扩展参数
-        extra_headers = {
-            "X-HW-ID": "",
-            "X-HW-APPKEY": ""
-        }
-        extra_body = {
-            "model": self.model_name,
-            "scene": "",
-            "operator": ""
-        }
-
         # 实现重试策略
         for attempt in range(MAX_RETRY_ATTEMPTS):
             try:
                 # 调用模型接口
                 response = await asyncio.to_thread(
                     self.client.chat.completions.create,
-                    model=self.model_name, 
-                    messages=messages, 
-                    extra_headers=extra_headers,
-                    extra_body=extra_body,
+                    model=self.model_name,
+                    messages=messages,
                     **params
                 )
                 
@@ -291,27 +229,15 @@ class FuYaoModels(LLM):
             if key not in params:
                 params[key] = value
 
-        # 添加扩展参数
-        extra_headers = {
-            "X-HW-ID": "",
-            "X-HW-APPKEY": ""
-        }
-        extra_body = {
-            "model": self.model_name,
-            "scene": "",
-            "operator": ""
-        }
-
         # 实现重试策略
         for attempt in range(MAX_RETRY_ATTEMPTS):
             try:
                 response = await asyncio.to_thread(
                     self.client.chat.completions.create,
-                    model=self.model_name, 
-                    messages=messages, 
-                    extra_headers=extra_headers,
-                    extra_body=extra_body,
-                    **params)
+                    model=self.model_name,
+                    messages=messages,
+                    **params
+                )
                 
                 # 检查响应结构是否有效
                 if (not response.choices or not response.choices[0].message):
@@ -389,26 +315,13 @@ class FuYaoModels(LLM):
             if key not in params:
                 params[key] = value
 
-        # 添加扩展参数
-        extra_headers = {
-            "X-HW-ID": "",
-            "X-HW-APPKEY": ""
-        }
-        extra_body = {
-            "model": self.model_name,
-            "scene": "",
-            "operator": ""
-        }
-
         # 实现重试策略
         for attempt in range(MAX_RETRY_ATTEMPTS):
             try:
                 response = await asyncio.to_thread(
                     self.client.chat.completions.create,
-                    model=self.model_name, 
-                    messages=messages, 
-                    extra_headers=extra_headers,
-                    extra_body=extra_body,
+                    model=self.model_name,
+                    messages=messages,
                     **params
                 )
                 

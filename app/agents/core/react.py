@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import re
@@ -168,7 +169,7 @@ class ReActAgent(BaseAgent):
             
         Returns:
             str: Execution result
-        """       
+        """
         if not self.session_id:
             raise ValueError("Session ID is required")
         
@@ -177,11 +178,11 @@ class ReActAgent(BaseAgent):
             logging.warning(f"Agent is busy with state {self.state}, resetting...")
             self.reset()
         
-        try:
-            llm = llm_factory.create_model(provider=self.llm_provider, model=self.llm_model)
-            context_builder = ContextBuilder(self.session_id, self.agent_path, self.workspace_path, self.params)
-            memory_manager = MemoryManager(self.session_id, self.workspace_path)
 
+        llm = llm_factory.create_model(provider=self.llm_provider, model=self.llm_model)
+        context_builder = ContextBuilder(self.session_id, self.agent_path, self.workspace_path, self.params)
+        memory_manager = MemoryManager(self.session_id, self.workspace_path)
+        try:
             # 构建提示词
             self.system_prompt = await context_builder.build_system_prompt() or self.system_prompt
             question = await context_builder.build_user_content(question)
@@ -230,8 +231,13 @@ class ReActAgent(BaseAgent):
             raise
         finally:
             self.reset()
-            # 记忆提取
-            await memory_manager.consolidate_memory()
+            # 记忆提取放到后台异步任务，不阻塞主流程
+            def _on_consolidate_done(task: asyncio.Task) -> None:
+                try:
+                    task.result()
+                except Exception as e:
+                    logging.warning("Memory consolidate_memory (background) failed: %s", e)
+            asyncio.create_task(memory_manager.consolidate_memory()).add_done_callback(_on_consolidate_done)
 
 
     async def think(self, llm: Any, question: str) -> Tuple[str, bool]:
@@ -281,7 +287,7 @@ class ReActAgent(BaseAgent):
             return response.content, tool_calls
 
         except Exception as e:
-            logging.error(f"Error in {self.agent_name}'s thinking process: {str(e)}")
+            logging.error(f"Error in agent(%s) thinking process: %s", self.agent_type, e)
             raise RuntimeError(str(e))
 
     async def act(self, tool_calls: List[ToolCall]) -> None:
@@ -292,7 +298,7 @@ class ReActAgent(BaseAgent):
                 await self.push_history_message_and_notify_user(Message.tool_result_message(result, toolcall.function.name, toolcall.id))
 
         except Exception as e:
-            logging.error(f"Error in {self.agent_name}'s act process: {str(e)}")
+            logging.error(f"Error in agent(%s) act process: %s", self.agent_type, e)
             raise RuntimeError(str(e))
 
     async def execute_tool(self, toolcall: ToolCall) -> str:

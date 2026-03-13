@@ -8,7 +8,7 @@
     "openai": {
       "description": "OpenAI GPT系列模型",
       "base_url": "https://api.openai.com/v1",
-      "api_key": "your_openai_api_key",
+      "api_key": "",
       "is_valid": 0,
       "instances": {
         "gpt-4o": {
@@ -42,7 +42,7 @@
     "qwen": {
       "description": "阿里云通义千问系列模型",
       "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-      "api_key": "your_qwen_api_key",
+      "api_key": "",
       "is_valid": 0,
       "instances": {
         "qwen-max": {
@@ -56,21 +56,33 @@
     "siliconflow": {
       "description": "SiliconFlow系列模型",
       "base_url": "https://api.siliconflow.cn/v1",
-      "api_key": "your_siliconflow_api_key",
-      "is_valid": 0,
+      "api_key": "sk-fpjtzotykpynqzkajwbkzozdryscztuuhlaqjwwqtwkvluql",
+      "is_valid": 1,
       "instances": {
         "llama-3.3-70b-instruct": {
           "description": "LLaMA 3.3 70B指令版本"
         },
         "llama-3.3-8b-instruct": {
           "description": "LLaMA 3.3 8B指令版本"
+        },
+        "deepseek-ai/DeepSeek-V3.2": {
+          "description": "DeepSeek V3.2 最新版本"
+        },
+        "Qwen/Qwen3.5-122B-A10B": {
+          "description": "Qwen3.5 122B A10B 最新版本"
+        },
+        "Pro/zai-org/GLM-5": {
+          "description": "GLM-5 最新版本"
+        },
+        "Pro/MiniMaxAI/MiniMax-M2.5": {
+          "description": "MiniMax-M2.5 最新版本"
         }
       }
     },
     "claude": {
       "description": "Anthropic Claude系列模型",
       "base_url": "https://api.anthropic.com",
-      "api_key": "your_claude_api_key",
+      "api_key": "",
       "is_valid": 0,
       "instances": {
         "claude-3.5-sonnet-20241022": {
@@ -81,11 +93,28 @@
         }
       }
     },
+    "zhipu": {
+      "description": "智谱AI系列模型",
+      "base_url": "",
+      "api_key": "d9d27a1a5fe84f1489e009ee0bfaba87.v6n1LcdOlRzy67lS",
+      "is_valid": 1,
+      "instances": {
+        "glm-5": {
+          "description": "智谱AI GLM-5 最新版本"
+        },
+        "glm-4.7": {
+          "description": "智谱AI GLM-4.7 最新版本"
+        },
+        "glm-4.5": {
+          "description": "智谱AI GLM-4.5 最新版本"
+        }
+      }
+    },
     "fuyao": {
       "description": "FuYao系列模型",
-      "base_url": "https://api.deepseek.com/v1",
-      "api_key": "sk-d58716e57320414dbc3cb0630fa63573",
-      "is_valid": 1,
+      "base_url": "",
+      "api_key": "",
+      "is_valid": 0,
       "instances": {
         "deepseek-chat": {
           "description": "DeepSeek Chat 最新版本"

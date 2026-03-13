@@ -12,7 +12,7 @@ from app.infrastructure.llms.utils import num_tokens_from_string
 
 class OpenAIBase(LLM):
     """OpenAI兼容API的通用实现（适用于OpenAI、DeepSeek、Qwen等）"""
-    def __init__(self, api_key: str, model_name: str, base_url: str, language: str = "Chinese", **kwargs):
+    def __init__(self, api_key: str, model_name: str, base_url: Optional[str] = None, language: str = "Chinese", **kwargs):
         """初始化OpenAI兼容的聊天模型"""
         
         super().__init__(api_key, model_name, base_url, language, **kwargs)
@@ -56,6 +56,7 @@ class OpenAIBase(LLM):
                   user_prompt: str,
                   user_question: str,
                   history: List[Dict[str, Any]] = None,
+                  with_think: Optional[bool] = False,
                   **kwargs) -> Tuple[ChatResponse, int]:
         """OpenAI兼容的聊天实现，支持失败重试"""
         messages = self._format_message(
@@ -63,11 +64,7 @@ class OpenAIBase(LLM):
         )
 
         # 构建参数
-        params = {
-            "stream": False,
-            "temperature": kwargs.get("temperature", self.configs.get("temperature", 0.7)),
-            "max_tokens": kwargs.get("max_tokens", self.configs.get("max_tokens", 2048))
-        }
+        params = {"stream": False}
         # 添加其他参数，避免重复
         for key, value in kwargs.items():
             if key not in params:
@@ -124,6 +121,7 @@ class OpenAIBase(LLM):
                   user_prompt: str,
                   user_question: str,
                   history: List[Dict[str, Any]] = None,
+                  with_think: Optional[bool] = False,
                   **kwargs) -> Tuple[AsyncGenerator[str, None], int]:
         """OpenAI兼容的聊天流式实现，支持失败重试"""
         messages = self._format_message(
@@ -131,11 +129,7 @@ class OpenAIBase(LLM):
         )
 
         # 构建参数
-        params = {
-            "stream": True,  # 流式响应始终为True
-            "temperature": kwargs.get("temperature", self.configs.get("temperature", 0.7)),
-            "max_tokens": kwargs.get("max_tokens", self.configs.get("max_tokens", 2048))
-        }
+        params = {"stream": True}
         # 添加其他参数，避免重复
         for key, value in kwargs.items():
             if key not in params:
@@ -222,6 +216,7 @@ class OpenAIBase(LLM):
                        history: List[Dict[str, Any]] = None,
                        tools: Optional[List[dict]] = None,
                        tool_choice: Literal["none", "auto", "required"] = "auto",
+                       with_think: Optional[bool] = False,
                        **kwargs) -> Tuple[AskToolResponse, int]:
         """OpenAI兼容的工具调用实现，支持失败重试"""
         if tool_choice == "required" and not tools:
@@ -234,12 +229,7 @@ class OpenAIBase(LLM):
             system_prompt, user_prompt, user_question, history
         )
         
-        params = {
-            "stream": False,
-            "temperature": kwargs.get("temperature", self.configs.get("temperature", 0.7)),
-            "max_tokens": kwargs.get("max_tokens", self.configs.get("max_tokens", 2048))
-        }
-
+        params = {"stream": False}
         if tools and tool_choice != "none":
             params["tools"] = tools
             params["tool_choice"] = tool_choice
@@ -310,6 +300,7 @@ class OpenAIBase(LLM):
                        history: List[Dict[str, Any]] = None,
                        tools: Optional[List[dict]] = None,
                        tool_choice: Literal["none", "auto", "required"] = "auto",
+                       with_think: Optional[bool] = False,
                        **kwargs) -> Tuple[AsyncGenerator[str, None], int]:
         """OpenAI兼容的工具调用流式实现，支持失败重试"""
         if tool_choice == "required" and not tools:
@@ -319,12 +310,7 @@ class OpenAIBase(LLM):
             system_prompt, user_prompt, user_question, history
         )
         
-        params = {
-            "stream": True,
-            "temperature": kwargs.get("temperature", self.configs.get("temperature", 0.7)),
-            "max_tokens": kwargs.get("max_tokens", self.configs.get("max_tokens", 2048))
-        }
-
+        params = {"stream": True}
         if tools and tool_choice != "none":
             params["tools"] = tools
             params["tool_choice"] = tool_choice

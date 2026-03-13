@@ -71,6 +71,7 @@ class LLM(ABC):
                   user_prompt: str,
                   user_question: str,
                   history: List[Dict[str, Any]] = None,
+                  with_think: Optional[bool] = False,
                   **kwargs) -> Tuple[ChatResponse, int]:
         """执行聊天对话，子类必须实现
         
@@ -79,6 +80,7 @@ class LLM(ABC):
             user_prompt (str): 用户提示词
             user_question (str): 用户问题
             history (Optional[List[Dict[str, Any]]]): 历史消息
+            with_think (bool): 是否开启思考
             kwargs (dict): 其他参数
         Returns:
             ChatResponse: 聊天响应
@@ -91,6 +93,7 @@ class LLM(ABC):
                 user_prompt: str,
                 user_question: str,
                 history: List[Dict[str, Any]] = None,
+                with_think: Optional[bool] = False,
                 **kwargs) -> Tuple[AsyncGenerator[str, None], int]:
         """执行聊天对话，子类必须实现
         
@@ -99,6 +102,7 @@ class LLM(ABC):
             user_prompt (str): 用户提示词
             user_question (str): 用户问题
             history (Optional[List[Dict[str, Any]]]): 历史消息
+            with_think (bool): 是否开启思考
             kwargs (dict): 其他参数
         Returns:
             ChatResponse: 聊天响应
@@ -113,6 +117,7 @@ class LLM(ABC):
                        history: List[Dict[str, Any]] = None,
                        tools: Optional[List[dict]] = None,
                        tool_choice: Literal["none", "auto", "required"] = "auto",
+                       with_think: Optional[bool] = False,
                        **kwargs) -> Tuple[AskToolResponse, int]:
         """执行工具调用，子类必须实现
         
@@ -123,6 +128,7 @@ class LLM(ABC):
             history (Optional[List[Dict[str, Any]]]): 历史消息
             tools (Optional[List[dict]]): 工具列表
             tool_choice (Literal["none", "auto", "required"]): 工具选择模式
+            with_think (bool): 是否开启思考
             kwargs (dict): 其他参数
         Returns:
             AskToolResponse: 工具调用响应
@@ -136,6 +142,7 @@ class LLM(ABC):
                        history: List[Dict[str, Any]] = None,
                        tools: Optional[List[dict]] = None,
                        tool_choice: Literal["none", "auto", "required"] = "auto",
+                       with_think: Optional[bool] = False,
                        **kwargs) -> Tuple[AsyncGenerator[str, None], int]:
         """执行工具调用，子类必须实现
         
@@ -146,6 +153,7 @@ class LLM(ABC):
             history (Optional[List[Dict[str, Any]]]): 历史消息
             tools (Optional[List[dict]]): 工具列表
             tool_choice (Literal["none", "auto", "required"]): 工具选择模式
+            with_think (bool): 是否开启思考
             kwargs (dict): 其他参数
         Returns:
             AskToolResponse: 工具调用响应
@@ -160,7 +168,7 @@ class LLM(ABC):
         # 扩展重试条件，包含更多网络相关错误
         retryable_keywords = [
             'rate limit', '429', 'server', '502', '503', '504', '500',
-            'connection', 'timeout', 'network', 'temporary', 'busy', 
+            'connection', 'timeout', 'timed out', 'network', 'temporary', 'busy', 
             'overload', 'service unavailable', 'internal server error',
             'bad gateway', 'gateway timeout', 'too many requests'
         ]

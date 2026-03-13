@@ -6,7 +6,7 @@ from tavily import TavilyClient
 from app.config import settings
 
 
-class Tavily:
+class TavilySearch:
     def __init__(self):
         self.tavily_client = TavilyClient(api_key=settings.tavily_api_key)
 

@@ -1,6 +1,7 @@
 """Cron 到期执行的预置实现：按 payload.kind 分支 REMIND（推送通知）与 AGENT（调用 Agent）。"""
 import logging
 from app.agents.bus.queues import MESSAGE_BUS, InboundMessage, OutboundMessage
+from app.agents.sessions.message import Message
 from app.agents.sessions.manager import SESSION_MANAGER
 from .types import CronJob, CronKind
 
@@ -25,10 +26,12 @@ async def default_on_execute(job: CronJob) -> None:
             channel_id=channel_id,
             user_id=user_id,
             session_id=session_id,
-            content=payload.message,
+            content="定时提醒：" + payload.message,
         )
         await MESSAGE_BUS.push_outbound(msg)
-        logging.info("Cron job %s REMIND pushed to bus", job.id)
+        # 加入Session的History中
+        await SESSION_MANAGER.add_message(session_id, Message.assistant_message("定时提醒：" + payload.message))
+        logging.info("Cron job %s REMIND pushed to bus and session_id=%s", job.id, session_id)
     elif payload.kind == CronKind.AGENT:
         agent_type = payload.agent_type or "default"
         channel_type = payload.deliver_channel_type or ""
