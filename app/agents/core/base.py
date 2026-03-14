@@ -177,5 +177,6 @@ class BaseAgent(ABC):
     async def push_history_message_and_notify_user(self, message: Message):
         """Add message to session and push user"""
         await self.push_history_message(message)
-        await self.notify_user(message)
+        if message.tool_call_id is None: # 显示工具调用结果消息不通知用户
+            await self.notify_user(message)
 
