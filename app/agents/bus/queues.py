@@ -54,11 +54,11 @@ class MessageBus:
         self.inbound: asyncio.Queue[InboundMessage] = asyncio.Queue()
         self.outbound: asyncio.Queue[OutboundMessage] = asyncio.Queue()
         # session mailbox/worker 模型：同一 session 串行、不同 session 并行
-        # - _session_mailboxes: 每个 session 一个收件箱（队列），同 session 的 inbound 先进入该队列
+        # - session_mailboxes: 每个 session 一个收件箱（队列），同 session 的 inbound 先进入该队列
         # - _session_workers: 每个 session 一个 worker 协程任务，循环消费 mailbox 并执行（天然串行）
         # - _session_last_active_at: 记录 session 最近一次收到消息的时间，用于 idle TTL 回收资源
         # - _session_lock: 保护上述 dict 的并发读写，避免并发分发时重复创建 mailbox/worker
-        self._session_mailboxes: Dict[str, asyncio.Queue[InboundMessage]] = {}  # key是session_id，value是asyncio.Queue[InboundMessage]
+        self.session_mailboxes: Dict[str, asyncio.Queue[InboundMessage]] = {}  # key是session_id，value是asyncio.Queue[InboundMessage]
         self._session_workers: Dict[str, asyncio.Task] = {}  # key是session_id，value是asyncio.Task
         self._session_last_active_at: Dict[str, float] = {}  
         self._session_lock = asyncio.Lock()
@@ -113,7 +113,7 @@ class MessageBus:
         in_cnt = self.inbound_size
         mailbox_total = 0
         current_session_pending_cnt = 0
-        for sid, q in self._session_mailboxes.items():
+        for sid, q in self.session_mailboxes.items():
             n = q.qsize()
             mailbox_total += n
             if session_id and sid == session_id:
@@ -129,7 +129,6 @@ class MessageBus:
             f"- out 通道待处理: {out_cnt}",
             f"- 所有会话 in 通道待处理: {mailbox_total}",
             f"- 当前会话 in 通道待处理: {current_session_pending_cnt}",
-            "**Agent运行状态**",
             f"- 运行态 Agent 数量: {run_cnt}",
             f"- 当前会话运行态 Agent 数量: {current_session_run_cnt}",
         ]
@@ -199,10 +198,10 @@ class MessageBus:
         if not session_id:
             raise ValueError("Session ID is required")
         async with self._session_lock:
-            mailbox = self._session_mailboxes.get(session_id)
+            mailbox = self.session_mailboxes.get(session_id)
             if mailbox is None:
                 mailbox = asyncio.Queue(maxsize=SESSION_MAILBOX_MAXSIZE)
-                self._session_mailboxes[session_id] = mailbox
+                self.session_mailboxes[session_id] = mailbox
             self._session_last_active_at[session_id] = asyncio.get_running_loop().time()
             worker = self._session_workers.get(session_id)
             if worker is None or worker.done():
@@ -216,7 +215,7 @@ class MessageBus:
 
     async def _run_session_worker(self, session_id: str) -> None:
         while True:
-            mailbox = self._session_mailboxes.get(session_id)
+            mailbox = self.session_mailboxes.get(session_id)
             if mailbox is None:
                 return
             try:
@@ -226,7 +225,7 @@ class MessageBus:
                     last_active_at = self._session_last_active_at.get(session_id)
                     now = asyncio.get_running_loop().time()
                     if last_active_at is None or now - last_active_at >= SESSION_IDLE_TTL_SEC:
-                        self._session_mailboxes.pop(session_id, None)
+                        self.session_mailboxes.pop(session_id, None)
                         self._session_last_active_at.pop(session_id, None)
                         self._session_workers.pop(session_id, None)
                         return
