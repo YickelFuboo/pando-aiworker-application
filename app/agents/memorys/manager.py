@@ -11,6 +11,7 @@ import logging
 from pathlib import Path
 from typing import List, Optional, Tuple
 from pydantic import BaseModel, Field
+from app.utils.common import increase_md_heading_levels
 from app.agents.sessions.message import Message
 from app.agents.sessions.session import Session
 from app.agents.sessions.manager import SESSION_MANAGER
@@ -91,6 +92,8 @@ class MemoryManager:
         session_id: str,
         workspace_path: str,
         agent_path: str,
+        agent_type: str,
+        agent_description: str = "",
         llm_provider: Optional[str] = None,
         llm_model: Optional[str] = None,
     ) -> None:
@@ -98,6 +101,8 @@ class MemoryManager:
         self._workspace_memory = Path(workspace_path) / MEMORY_DIR / "MEMORY.md"
         self._workspace_history = Path(workspace_path) / MEMORY_DIR / "HISTORY.md"
         self._agent_memory = Path(agent_path) / MEMORY_DIR / "MEMORY.md"
+        self._agent_type = agent_type
+        self._agent_description = agent_description or ""
         self._llm_provider = llm_provider or ""
         self._llm_model = llm_model or ""
 
@@ -198,7 +203,16 @@ class MemoryManager:
             return
         system_prompt = MemoryExtractPrompt.for_agent().system_prompt
         current_memory = await self._read_file(self._agent_memory)
-        user_content = f"## Current Agent Memory\n{current_memory or '(empty)'}\n\n## Content to Process\n{content}"
+        agent_info = (
+            f"## Agent Info\n"
+            f"- Type: {self._agent_type}\n"
+            f"- Description: {self._agent_description or '(none)'}\n\n"
+        )
+        user_content = (
+            f"{agent_info}"
+            f"## Current Agent Memory\n{current_memory or '(empty)'}\n\n"
+            f"## Content to Process\n{content}"
+        )
         user_question = f"{MemoryExtractPrompt.for_agent().user_instruction}\n\n{user_content}"
         memory_update, _ = await self._extract(
             system_prompt=system_prompt,
@@ -264,7 +278,8 @@ class MemoryManager:
         content = await self._read_file(self._workspace_memory)
         if not (content or "").strip():
             return ""
-        return f"## Long-term Memory\n{content.strip()}\n"
+        content = increase_md_heading_levels(content.strip(), levels=2)
+        return f"## Long-term Memory\n{content}\n"
 
     async def get_agent_memory_context(self) -> str:
         """将 Agent 类型记忆拼成可追加到 Prompt 的 Markdown 片段（来自 .agent/<agent_type>/memory/MEMORY.md）。"""
@@ -273,7 +288,8 @@ class MemoryManager:
         content = await self._read_file(self._agent_memory)
         if not (content or "").strip():
             return ""
-        return f"## Agent Experience (success/failure)\n{content.strip()}\n"
+        content = increase_md_heading_levels(content.strip(), levels=2)
+        return f"## Agent Experience (success/failure)\n{content}\n"
 
     async def get_memory_context(
         self,

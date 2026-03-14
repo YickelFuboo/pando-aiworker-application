@@ -1,12 +1,8 @@
 import asyncio
 import json
 import logging
-import re
-from typing import Any, List, Literal, Optional, Tuple
-from enum import Enum
-from pathlib import Path
-from app.config.settings import PROJECT_BASE_DIR
-from app.agents.core.base import AgentState, BaseAgent, ToolChoice
+from typing import Any, List, Optional, Tuple
+from app.agents.core.base import AgentState, BaseAgent, ToolChoice, AGENT_DIR, WORKSPACE_DIR
 from app.agents.tools.base import BaseTool
 from app.agents.tools.factory import ToolsFactory
 from app.agents.sessions.message import Message, ToolCall, Function
@@ -23,10 +19,6 @@ from app.agents.tools.local.ask_question import AskQuestion
 from app.agents.tools.local.terminate import Terminate
 from app.agents.tools.local.spawn import SpawnTool
 
-
-# 当前文件所在目录（各技能为子目录，如 memory/SKILL.md）
-AGENT_DIR = Path(PROJECT_BASE_DIR) / ".agent"
-WORKSPACE_DIR = Path(PROJECT_BASE_DIR) / "data" / ".workspace"
 
 # MCP 配置：.agent/{agent_type}/mcp_servers.json
 MCP_SERVERS_FILENAME = "mcp_servers.json"
@@ -72,8 +64,7 @@ class ReActAgent(BaseAgent):
             **kwargs,
         )
 
-        # 设置工作空间路径        
-        self.agent_path = str(AGENT_DIR / agent_type)
+        # 设置工作空间路径
         if agent_type == "AiAssistant":
             self.workspace_path = str(WORKSPACE_DIR / self.user_id / self.agent_type)
         else:
@@ -188,8 +179,19 @@ class ReActAgent(BaseAgent):
         self._state = AgentState.RUNNING
 
         llm = llm_factory.create_model(provider=self.llm_provider, model=self.llm_model)
-        context_builder = ContextBuilder(self.session_id, self.agent_path, self.workspace_path, self.params)
-        memory_manager = MemoryManager(self.session_id, self.workspace_path, agent_path=self.agent_path)
+        context_builder = ContextBuilder(
+            self.session_id, self.workspace_path, self.agent_path, 
+            agent_type=self.agent_type,
+            agent_description=self.description,
+            params=self.params,
+        )
+        memory_manager = MemoryManager(
+            self.session_id, self.workspace_path, self.agent_path,
+            agent_type=self.agent_type,
+            agent_description=self.description,
+            llm_provider=self.llm_provider,
+            llm_model=self.llm_model,
+        )
         try:
             # 连接并注册 MCP 工具
             await self._register_mcp_tools()

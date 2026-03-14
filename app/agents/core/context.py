@@ -19,13 +19,25 @@ AGENT_CONTEXT_FILES = ["AGENT.md", "SOUL.md", "USER.md", "TOOLS.md", "IDENTITY.m
 
 class ContextBuilder:
 
-    def __init__(self, session_id: str, agent_path: str, workspace_path: str, params: Optional[dict[str, Any]] = None):
+    def __init__(
+        self,
+        session_id: str,
+        workspace_path: str,
+        agent_path: str,
+        agent_type: str,
+        agent_description: str = "",
+        params: Optional[dict[str, Any]] = None,
+    ):
         self.session_id = session_id
         self.agent_path = agent_path
         self.workspace_path = workspace_path
         self.params = dict(params) if params else {}
         self.skills_manager = SkillsManager(agent_path)
-        self.memory_manager = MemoryManager(session_id, workspace_path, agent_path=agent_path)
+        self.memory_manager = MemoryManager(
+            session_id, workspace_path, agent_path,
+            agent_type=agent_type,
+            agent_description=agent_description,
+        )
     
     async def build_system_prompt(self, skill_names: list[str] | None = None) -> str:
         """

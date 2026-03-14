@@ -1,8 +1,11 @@
+import json
 import logging
 import re
 from abc import ABC
 from enum import Enum
+from pathlib import Path
 from typing import Any, Dict, List, Optional
+from app.config.settings import PROJECT_BASE_DIR
 from app.agents.sessions.manager import SESSION_MANAGER
 from app.agents.sessions.message import Role, Message
 
@@ -22,6 +25,9 @@ class ToolChoice(str, Enum):
     AUTO = "auto"
     REQUIRED = "required"
 
+# 当前文件所在目录（各技能为子目录，如 memory/SKILL.md）
+AGENT_DIR = Path(PROJECT_BASE_DIR) / ".agent"
+WORKSPACE_DIR = Path(PROJECT_BASE_DIR) / "data" / ".workspace"
 
 class BaseAgent(ABC):
     """Base Agent class
@@ -50,6 +56,7 @@ class BaseAgent(ABC):
     ):
         # 基本信息
         self.agent_type = agent_type
+        self.description: str = ""
 
         # 客户端信息
         self.channel_type = channel_type
@@ -78,6 +85,21 @@ class BaseAgent(ABC):
         self._max_steps = max_steps or 100
         self._max_duplicate_steps = max_duplicate_steps or 2   # 最大重复次数，用于检验当前项agent是否挂死
         self._stop_requested = False
+
+        self.agent_path = str(AGENT_DIR / agent_type)
+        self._load_meta(self.agent_path)
+
+    def _load_meta(self, agent_path: str) -> None:
+        """Load .agent/{agent_type}/meta.json and set description (English)."""
+        meta_path = Path(agent_path) / "meta.json"
+        if not meta_path.is_file():
+            return
+        try:
+            with open(meta_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            self.description = (data.get("description_en") or "").strip()
+        except Exception as e:
+            logging.warning("Failed to load meta.json for agent %s: %s", self.agent_type, e)
 
     def force_stop(self) -> None:
         """强制当前运行中的 Agent 停止（由外部如 /stop 命令调用）。"""
