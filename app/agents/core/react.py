@@ -117,8 +117,8 @@ class ReActAgent(BaseAgent):
         tools_to_register: List[BaseTool] = []
         if "ask_question" in usable:
             tools_to_register.append(AskQuestion())
-        if "terminate" in usable:
-            tools_to_register.append(Terminate())
+        #if "terminate" in usable:
+        #    tools_to_register.append(Terminate())
         if "read_file" in usable:
             tools_to_register.append(ReadFileTool())
         if "write_file" in usable:
@@ -167,14 +167,14 @@ class ReActAgent(BaseAgent):
         except Exception as e:
             logging.error("Failed to connect MCP servers (will retry next run): %s", e)
 
-    async def run(self, question: str) -> None:
+    async def run(self, question: str) -> str:
         """Run the agent
         
         Args:
             question: Input question
             
         Returns:
-            None
+            str: Execution result
         """
         if not self.session_id:
             raise ValueError("Session ID is required")
@@ -200,6 +200,7 @@ class ReActAgent(BaseAgent):
             question = await context_builder.build_user_content(question)
 
             # 设置添加用户消息到history标志
+            content = ""
             had_push_user_message = False
             while (self._current_step < self._max_steps and self._state != AgentState.FINISHED and not self._stop_requested):
                 self._current_step += 1
@@ -211,7 +212,7 @@ class ReActAgent(BaseAgent):
                         await self.push_history_message(Message.user_message(original_question))
                         had_push_user_message = True
                     await self.push_history_message_and_notify_user(Message.assistant_message(content))
-                    # break 等待AI明确退出工具信号，没有工具信息时候不退出
+                    break
                 else:
                     if not had_push_user_message:
                         await self.push_history_message(Message.user_message(original_question))
@@ -230,6 +231,8 @@ class ReActAgent(BaseAgent):
             if self._current_step >= self._max_steps:
                 content += f"\n\n Terminated: Reached max steps ({self._max_steps})"
                 await self.push_history_message_and_notify_user(Message.assistant_message(content))
+
+            return content
         except Exception as e:
             self._state = AgentState.ERROR
             await self.push_history_message_and_notify_user(Message.assistant_message(f"Error in agent execution: {str(e)}"))
@@ -340,8 +343,8 @@ class ReActAgent(BaseAgent):
         args = json.loads(toolcall.function.arguments or "{}")   
         if name == "ask_question":
             await self.push_history_message_and_notify_user(Message.assistant_message(args.get("question") or ""))
-        elif name == "terminate":
-            await self.push_history_message_and_notify_user(Message.assistant_message(args.get("summary") or ""))
+        #elif name == "terminate":
+        #    await self.push_history_message_and_notify_user(Message.assistant_message(args.get("summary") or ""))
 
         self._state = AgentState.FINISHED
         logging.info(f"Task completion or phased completion by special tool '{name}'")

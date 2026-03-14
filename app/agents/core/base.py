@@ -98,14 +98,14 @@ class BaseAgent(ABC):
             logging.error(f"Error in agent reset: {str(e)}")
             raise e
 
-    async def run(self, question: str) -> None:
+    async def run(self, question: str) -> str:
         """Run the agent
         
         Args:
             question: Input question
             
         Returns:
-            None
+            str: Execution result
         """
         pass
  
