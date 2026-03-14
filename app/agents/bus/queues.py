@@ -108,21 +108,21 @@ class MessageBus:
         """当前运行中的 Agent 数量。"""
         return len(self.running_agent_pool)
     
-    def _get_status_text(self, session_id: Optional[str] = None) -> str:
-        """生成 /status 的回复文案；若传入 session_id 则包含该 Session 待处理消息数。"""
+    async def _get_status_text(self, session_id: Optional[str] = None) -> str:
+        """生成 /status 的回复文案；持 _session_lock 快照 session_mailboxes，避免遍历时 dict 被并发修改。"""
         in_cnt = self.inbound_size
+        out_cnt = self.outbound_size
+        run_cnt = self.running_agent_count
+        current_session_run_cnt = 1 if (session_id and session_id in self.running_agent_pool) else 0
         mailbox_total = 0
         current_session_pending_cnt = 0
-        for sid, q in self.session_mailboxes.items():
+        async with self._session_lock:
+            snapshot = list(self.session_mailboxes.items())
+        for sid, q in snapshot:
             n = q.qsize()
             mailbox_total += n
             if session_id and sid == session_id:
                 current_session_pending_cnt = n
-        out_cnt = self.outbound_size
-        run_cnt = self.running_agent_count
-        current_session_run_cnt = 0
-        if session_id:
-            current_session_run_cnt = len(self.running_agent_pool.get(session_id, []))
         lines = [
             "**消息总线状态**",
             f"- in 通道待处理: {in_cnt}",
@@ -152,7 +152,7 @@ class MessageBus:
             # 系统命令直接处理不排队
             content_stripped = (inbound_msg.content or "").strip()
             if content_stripped == "/status":
-                status_text = self._get_status_text(session_id=inbound_msg.session_id)
+                status_text = await self._get_status_text(session_id=inbound_msg.session_id)
                 await self.push_outbound(OutboundMessage(
                     channel_type=inbound_msg.channel_type,
                     channel_id=inbound_msg.channel_id,
@@ -206,12 +206,19 @@ class MessageBus:
             worker = self._session_workers.get(session_id)
             if worker is None or worker.done():
                 self._session_workers[session_id] = asyncio.create_task(self._run_session_worker(session_id))
-        if mailbox.full():
+            if mailbox.full():
+                try:
+                    mailbox.get_nowait()
+                except Exception:
+                    pass
             try:
-                mailbox.get_nowait()
-            except Exception:
-                pass
-        await mailbox.put(inbound_msg)
+                mailbox.put_nowait(inbound_msg)
+            except asyncio.QueueFull:
+                try:
+                    mailbox.get_nowait()
+                except Exception:
+                    pass
+                mailbox.put_nowait(inbound_msg)
 
     async def _run_session_worker(self, session_id: str) -> None:
         while True:

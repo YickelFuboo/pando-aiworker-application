@@ -199,6 +199,8 @@ class Message(BaseModel):
 
     def _tool_result_to_md(self) -> str:
         """将工具执行结果消息转为 MD。"""
+        lines = [(self.name or "") + " executed. "]
+        """
         lines = [(self.name or "") + " result： "]
         raw = _strip_ansi((self.content or "").strip())
         try:
@@ -215,4 +217,5 @@ class Message(BaseModel):
                 lines.append("```text")
                 lines.append(raw or "(无)")
                 lines.append("```")
+        """
         return "\n".join(lines)
