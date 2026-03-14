@@ -58,3 +58,38 @@
 3. Navigate to relevant folders based on naming/organization
 4. Use `dir ... | findstr` for targeted searches within known locations
 5. Avoid PowerShell `-Recurse` patterns that trigger safety blocks
+
+## ClawHub Skill Registry
+
+### Purpose
+- Public skill registry for AI agents at https://clawhub.ai
+- Search and install agent skills using natural language (vector search)
+
+### Effective Commands
+- **Search for skills**: `npx --yes clawhub@latest search "<query>" --limit N`
+  - Example: `npx --yes clawhub@latest search "email send" --limit 5`
+  - Returns matching skills with relevance scores
+
+### Known Skill Categories
+- Email sending: send-email, email-send, resend-email-sender
+- Scheduling: cron (built-in skill for reminders and recurring tasks)
+
+## Cron Skill (Built-in)
+
+### Three Modes
+1. **Reminder** - message is sent directly to user
+2. **Task** - message is a task description, agent executes and sends result
+3. **One-time** - runs once at a specific time, then auto-deletes
+
+### Usage Pattern
+```
+cron(action="add", message="...", every_seconds=N)
+```
+
+## Multi-step Solution Design Pattern
+
+When user requests complex automation (e.g., daily AI news search + email notification):
+1. Check available built-in skills (cron for scheduling)
+2. Search ClawHub for additional required skills (email sending)
+3. Combine skills to build complete solution
+4. User-specific data (email addresses, preferences) should be stored in user memory, not agent memory

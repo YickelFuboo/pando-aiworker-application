@@ -32,7 +32,7 @@ class ContextBuilder:
         self.agent_path = agent_path
         self.workspace_path = workspace_path
         self.params = dict(params) if params else {}
-        self.skills_manager = SkillsManager(agent_path)
+        self.skills_manager = SkillsManager(workspace_path, agent_path)
         self.memory_manager = MemoryManager(
             session_id, workspace_path, agent_path,
             agent_type=agent_type,

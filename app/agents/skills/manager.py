@@ -19,9 +19,10 @@ class SkillsManager:
     技能加载器：从工作区与内置目录列举/读取 SKILL.md，为 ContextBuilder 提供
     常驻技能全文与全体技能摘要（按需加载时 Agent 用 read_file 读 path）。
     """
-    def __init__(self, agent_path: str):      
+    def __init__(self, workspace_path: str, agent_path: str):   
         self.builtin_skills_dir = Path(Path(__file__).parent)
-        self.agent_skills_dir = Path(agent_path) / SKILLS_DIR  # Agent特有的Skills
+        self.agent_skills_dir = Path(agent_path) / SKILLS_DIR  # Agent特有的Skills   
+        self.workspace_path_dir = Path(workspace_path) / SKILLS_DIR  # 工作空间特有的Skills
     
     def list_skills(self, filter_unavailable: bool = True) -> list[dict[str, str]]:
         """
@@ -30,6 +31,13 @@ class SkillsManager:
         filter_unavailable=True 时排除 requires（bins/env）未满足的技能。
         """
         skills = []
+        if self.workspace_path_dir and self.workspace_path_dir.exists():
+            for skill_dir in self.workspace_path_dir.iterdir():
+                if skill_dir.is_dir():
+                    skill_file = skill_dir / "SKILL.md"
+                    if skill_file.exists() and not any(s["name"] == skill_dir.name for s in skills):
+                        skills.append({"name": skill_dir.name, "path": str(skill_file), "source": "workspace"})
+
         if self.agent_skills_dir and self.agent_skills_dir.exists():
             for skill_dir in self.agent_skills_dir.iterdir():
                 if skill_dir.is_dir():
@@ -50,6 +58,11 @@ class SkillsManager:
     
     def load_skill(self, name: str) -> str | None:
         """按技能名（目录名）读取 SKILL.md 全文，先查工作区再查内置，找不到返回 None。"""
+        if self.workspace_path_dir and self.workspace_path_dir.exists():
+            workspace_skill = self.workspace_path_dir / name / "SKILL.md"
+            if workspace_skill.exists():
+                return workspace_skill.read_text(encoding="utf-8")
+
         if self.agent_skills_dir:
             agent_skill = self.agent_skills_dir / name / "SKILL.md"
             if agent_skill.exists():
