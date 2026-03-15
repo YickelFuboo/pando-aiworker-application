@@ -189,20 +189,33 @@ class CronManager:
         logging.info("Added cron job id=%s name=%s", job_id, name)
         return job
 
-    async def remove_job(self, job_id: str) -> bool:
-        ok = await self._store.remove_job(job_id)
-        if ok:
-            logging.info("Removed cron job id=%s", job_id)
-        return ok
+    def _belongs_to_user(self, job: CronJob, user_id: Optional[str]) -> bool:
+        if not user_id:
+            return True
+        return (job.payload.user_id or "") == user_id
 
-    async def list_jobs(self) -> List[CronJob]:
-        return await self._store.list_jobs()
+    async def remove_job(self, job_id: str, user_id: Optional[str] = None) -> bool:
+        job = await self.get_job(job_id, user_id)
+        if job is None:
+            return False
+        await self._store.remove_job(job_id)
+        logging.info("Removed cron job id=%s", job_id)
+        return True
 
-    async def get_job(self, job_id: str) -> Optional[CronJob]:
-        return await self._store.get_job(job_id)
+    async def list_jobs(self, user_id: Optional[str] = None) -> List[CronJob]:
+        jobs = await self._store.list_jobs()
+        if user_id is None:
+            return jobs
+        return [j for j in jobs if self._belongs_to_user(j, user_id)]
 
-    async def set_job_enabled(self, job_id: str, enabled: bool) -> bool:
+    async def get_job(self, job_id: str, user_id: Optional[str] = None) -> Optional[CronJob]:
         job = await self._store.get_job(job_id)
+        if job is None or not self._belongs_to_user(job, user_id):
+            return None
+        return job
+
+    async def set_job_enabled(self, job_id: str, enabled: bool, user_id: Optional[str] = None) -> bool:
+        job = await self.get_job(job_id, user_id)
         if job is None:
             return False
         job.enabled = enabled
@@ -210,13 +223,15 @@ class CronManager:
         await self._store.update_job(job)
         return True
 
-    async def update_job(self, job: CronJob) -> None:
-        """将已修改的 job 写回存储（如修改 payload.message 后调用）。"""
+    async def update_job(self, job: CronJob, user_id: Optional[str] = None) -> None:
+        """将已修改的 job 写回存储（如修改 payload.message 后调用）。传入 user_id 时校验归属。"""
+        if user_id is not None and not self._belongs_to_user(job, user_id):
+            raise ValueError("job does not belong to user")
         job.updated_at_ms = _now_ms()
         await self._store.update_job(job)
 
-    async def run_job_now(self, job_id: str) -> bool:
-        job = await self.get_job(job_id)
+    async def run_job_now(self, job_id: str, user_id: Optional[str] = None) -> bool:
+        job = await self.get_job(job_id, user_id)
         if job is None:
             return False
         if self._on_execute:

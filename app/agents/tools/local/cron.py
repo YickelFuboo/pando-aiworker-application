@@ -31,7 +31,7 @@ class CronTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return "Schedule reminders and recurring tasks. Actions: add (create), list (query all), remove (delete by job_id), update (enable/disable or set message by job_id)."
+        return "Schedule reminders and recurring tasks. Actions: add (create), list (query current user's jobs), remove (delete by job_id), update (enable/disable or set message by job_id). List/remove/update only apply to current user's jobs."
 
     @property
     def parameters(self) -> Dict[str, Any]:
@@ -41,7 +41,7 @@ class CronTool(BaseTool):
                 "action": {
                     "type": "string",
                     "enum": ["add", "list", "remove", "update"],
-                    "description": "Action: add=create, list=query all, remove=delete, update=enable/disable or change message",
+                    "description": "Action: add=create, list=query current user's jobs, remove=delete, update=enable/disable or change message (remove/update only for own jobs)",
                 },
                 "message": {
                     "type": "string",
@@ -159,27 +159,20 @@ class CronTool(BaseTool):
         )
         return ToolSuccessResult(f"Created job '{job.name}' (id: {job.id})")
 
-    def _is_own_job(self, job) -> bool:
-        return (job.payload.user_id or "") == self._user_id
-
     async def _list(self) -> ToolResult:
-        jobs = await self._cron.list_jobs()
-        own = [j for j in jobs if self._is_own_job(j)]
-        if not own:
+        jobs = await self._cron.list_jobs(user_id=self._user_id)
+        if not jobs:
             return ToolSuccessResult("No scheduled jobs for current user.")
-        lines = [f"- {j.name} (id: {j.id}, schedule: {j.schedule.kind}, enabled: {j.enabled})" for j in own]
+        lines = [f"- {j.name} (id: {j.id}, schedule: {j.schedule.kind}, enabled: {j.enabled})" for j in jobs]
         return ToolSuccessResult("Scheduled jobs:\n" + "\n".join(lines))
 
     async def _remove(self, job_id: Optional[str]) -> ToolResult:
         if not job_id:
             return ToolErrorResult("job_id is required for remove")
-        job = await self._cron.get_job(job_id)
-        if not job:
-            return ToolErrorResult(f"Job {job_id} not found")
-        if not self._is_own_job(job):
-            return ToolErrorResult(f"Job {job_id} does not belong to current user")
-        await self._cron.remove_job(job_id)
-        return ToolSuccessResult(f"Removed job {job_id}")
+        ok = await self._cron.remove_job(job_id, user_id=self._user_id)
+        if ok:
+            return ToolSuccessResult(f"Removed job {job_id}")
+        return ToolErrorResult(f"Job {job_id} not found or does not belong to current user")
 
     async def _update(
         self,
@@ -189,15 +182,13 @@ class CronTool(BaseTool):
     ) -> ToolResult:
         if not job_id:
             return ToolErrorResult("job_id is required for update")
-        job = await self._cron.get_job(job_id)
+        job = await self._cron.get_job(job_id, user_id=self._user_id)
         if not job:
-            return ToolErrorResult(f"Job {job_id} not found")
-        if not self._is_own_job(job):
-            return ToolErrorResult(f"Job {job_id} does not belong to current user")
+            return ToolErrorResult(f"Job {job_id} not found or does not belong to current user")
         if enabled is not None:
             job.enabled = enabled
         if message is not None:
             job.payload.message = message
         if enabled is not None or message is not None:
-            await self._cron.update_job(job)
+            await self._cron.update_job(job, user_id=self._user_id)
         return ToolSuccessResult(f"Updated job {job_id}")
