@@ -17,9 +17,9 @@ async def default_on_execute(job: CronJob) -> None:
         if not payload.need_deliver:
             logging.debug("Cron job %s REMIND need_deliver=False, skip", job.id)
             return
-        channel_type = payload.deliver_channel_type or "cron"
-        channel_id = payload.deliver_channel_id or job.id
-        user_id = payload.deliver_to or "cron"
+        channel_type = payload.channel_type or "cron"
+        channel_id = payload.channel_id or job.id
+        user_id = payload.user_id or "cron"
         session_id = payload.trigger_session_id or ""
         msg = OutboundMessage(
             channel_type=channel_type,
@@ -36,9 +36,9 @@ async def default_on_execute(job: CronJob) -> None:
         session_id = payload.trigger_session_id or ""
         if not session_id:
             session_id = await SESSION_MANAGER.create_session(
-                user_id=payload.deliver_to,
+                user_id=payload.user_id,
                 agent_type=payload.agent_type,
-                channel_type=payload.deliver_channel_type,
+                channel_type=payload.channel_type,
                 description=job.name or "cron",
             )
 
@@ -51,10 +51,10 @@ async def default_on_execute(job: CronJob) -> None:
 
         inbound = InboundMessage(
             agent_type=payload.agent_type,
-            channel_type=payload.deliver_channel_type,
-            channel_id=payload.deliver_channel_id,
+            channel_type=payload.channel_type,
+            channel_id=payload.channel_id,
             session_id=session_id,
-            user_id=payload.deliver_to,
+            user_id=payload.user_id,
             content=content or "执行定时任务",
         )
         await MESSAGE_BUS.push_inbound(inbound)

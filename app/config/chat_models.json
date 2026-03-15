@@ -1,8 +1,8 @@
 {
   "_comment": "LLM聊天模型配置文件 - 请根据实际需要修改api_key和base_url",
   "default": {
-    "provider": "zhipu",
-    "model": "glm-5"
+    "provider": "siliconflow",
+    "model": "zai-org/GLM-4.6"
   },
   "models": {
     "openai": {
@@ -12,13 +12,16 @@
       "is_valid": 0,
       "instances": {
         "gpt-4o": {
-          "description": "OpenAI GPT-4o 通用版本"
+          "description": "OpenAI GPT-4o 通用版本",
+          "max_tokens": 4096
         },
         "gpt-4o-mini": {
-          "description": "OpenAI GPT-4o Mini 轻量版本"
+          "description": "OpenAI GPT-4o Mini 轻量版本",
+          "max_tokens": 4096
         },
         "gpt-4-turbo": {
-          "description": "OpenAI GPT-4 Turbo"
+          "description": "OpenAI GPT-4 Turbo",
+          "max_tokens": 4096
         }
       }
     },
@@ -29,13 +32,12 @@
       "is_valid": 1,
       "instances": {
         "deepseek-chat": {
-          "description": "DeepSeek Chat 最新版本"
-        },
-        "deepseek-coder": {
-          "description": "DeepSeek Coder 代码专用模型"
+          "description": "DeepSeek Chat 最新版本",
+          "max_tokens": 8192
         },
         "deepseek-reasoner": {
-          "description": "DeepSeek Reasoner 推理专用模型"
+          "description": "DeepSeek Reasoner 推理专用模型",
+          "max_tokens": 8192
         }
       }
     },
@@ -46,10 +48,12 @@
       "is_valid": 0,
       "instances": {
         "qwen-max": {
-          "description": "通义千问Max 最强版本"
+          "description": "通义千问Max 最强版本",
+          "max_tokens": 8192
         },
         "qwen-plus": {
-          "description": "通义千问Plus 增强版本"
+          "description": "通义千问Plus 增强版本",
+          "max_tokens": 8192
         }
       }
     },
@@ -60,22 +64,32 @@
       "is_valid": 1,
       "instances": {
         "llama-3.3-70b-instruct": {
-          "description": "LLaMA 3.3 70B指令版本"
+          "description": "LLaMA 3.3 70B指令版本",
+          "max_tokens": 8192
         },
         "llama-3.3-8b-instruct": {
-          "description": "LLaMA 3.3 8B指令版本"
+          "description": "LLaMA 3.3 8B指令版本",
+          "max_tokens": 8192
         },
         "deepseek-ai/DeepSeek-V3.2": {
-          "description": "DeepSeek V3.2 最新版本"
+          "description": "DeepSeek V3.2 最新版本",
+          "max_tokens": 8192
         },
         "Qwen/Qwen3.5-122B-A10B": {
-          "description": "Qwen3.5 122B A10B 最新版本"
+          "description": "Qwen3.5 122B A10B 最新版本",
+          "max_tokens": 8192
         },
-        "Pro/zai-org/GLM-5": {
-          "description": "GLM-5 最新版本"
+        "zai-org/GLM-4.6": {
+          "description": "GLM-4.6 最新版本",
+          "max_tokens": 8192
+        },
+        "zai-org/GLM-4.5": {
+          "description": "GLM-5 最新版本",
+          "max_tokens": 8192
         },
         "Pro/MiniMaxAI/MiniMax-M2.5": {
-          "description": "MiniMax-M2.5 最新版本"
+          "description": "MiniMax-M2.5 最新版本",
+          "max_tokens": 8192
         }
       }
     },
@@ -86,10 +100,12 @@
       "is_valid": 0,
       "instances": {
         "claude-3.5-sonnet-20241022": {
-          "description": "Claude 3.5 Sonnet 最新版本"
+          "description": "Claude 3.5 Sonnet 最新版本",
+          "max_tokens": 8192
         },
         "claude-3.5-sonnet": {
-          "description": "Claude 3.5 Sonnet 通用版本"
+          "description": "Claude 3.5 Sonnet 通用版本",
+          "max_tokens": 8192
         }
       }
     },
@@ -100,13 +116,16 @@
       "is_valid": 1,
       "instances": {
         "glm-5": {
-          "description": "智谱AI GLM-5 最新版本"
+          "description": "智谱AI GLM-5 最新版本",
+          "max_tokens": 8192
         },
         "glm-4.7": {
-          "description": "智谱AI GLM-4.7 最新版本"
+          "description": "智谱AI GLM-4.7 最新版本",
+          "max_tokens": 4096
         },
         "glm-4.5": {
-          "description": "智谱AI GLM-4.5 最新版本"
+          "description": "智谱AI GLM-4.5 最新版本",
+          "max_tokens": 4096
         }
       }
     },
@@ -117,7 +136,8 @@
       "is_valid": 0,
       "instances": {
         "deepseek-chat": {
-          "description": "DeepSeek Chat 最新版本"
+          "description": "DeepSeek Chat 最新版本",
+          "max_tokens": 8192
         }
       }
     }

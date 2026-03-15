@@ -123,6 +123,11 @@ cron(action="add", kind="agent", message="Task description...", cron_expr="0 7 *
 - **Headers**: `Content-Type: application/json`, `X-Api-Key: <api_key>`
 - **Body**: `{"to": "recipient@email.com", "subject": "Subject", "body": "Message body"}`
 
+### Windows Compatibility
+- `curl` command may fail with "The system cannot find the path specified" error
+- Workaround: write JSON payload to a file and use `-d @filename` syntax
+- Example: Write to `temp_email.json` then use `curl -d @temp_email.json`
+
 ## Multi-step Solution Design Pattern
 
 When user requests complex automation (e.g., daily AI news search + email notification):
@@ -131,3 +136,15 @@ When user requests complex automation (e.g., daily AI news search + email notifi
 3. Install and configure external skills
 4. Combine skills to build complete solution
 5. User-specific data (email addresses, preferences) should be stored in user memory, not agent memory
+
+## AI Agent System Structure
+
+### Memory File Locations
+- **Agent-level memory**: `AiAssistant/memory/MEMORY.md` (permanent)
+- **Workspace-specific**: Located in `<workspace_id>/AiAssistant/memory/MEMORY.md`
+- **Default memory directory**: System may use `default/memory` as fallback (not agent-controlled)
+
+### Skill Installation Path
+- Skills install to specified `--workdir` path
+- Creates nested structure: `<workdir>/skills/<skill_name>/`
+- Example: `skills/skills/sendclaw/` (double skills folder due to registry structure)
